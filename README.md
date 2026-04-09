@@ -68,6 +68,9 @@ Additional tables and plots can be generated running "aux/run-r.sh". These inclu
 - Tumour Mutational Burden (TMB) tables
 - TMB box plots
 - TMB regression against the literature
+- scores (precision, recall, ...) for each variant type
+- scores (precision, recall, ...) for each test data set
+- scores (precision, recall, ...) for each sample
 
 ---
 
