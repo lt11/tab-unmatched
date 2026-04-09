@@ -61,11 +61,13 @@ The pipeline generates:
 - Processed datasets (*-df.csv, *-df-flt.csv)
 - Model files
 - Prediction tables (preds-*.csv)
+- ROC curves and AUC scores
 - Feature importance plots
 
-Additional tables and plots can be generated with "aux/run-r.sh". These include:
-- ROC curves and AUC scores
-- Tumour Mutational Burden (TMB)
+Additional tables and plots can be generated running "aux/run-r.sh". These include:
+- Tumour Mutational Burden (TMB) tables
+- TMB box plots
+- TMB regression against the literature
 
 ---
 
