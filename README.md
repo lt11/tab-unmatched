@@ -101,7 +101,7 @@ Then, install the following Python modules:
 Once you have prepared the VCF data with "prep-data.sh", running the script is as simple as:
 
 ```
-python unc-normal-drop-5 
+python unc-normal-drop-5.py
 ```
 
 ---
