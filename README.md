@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repository implements a machine learning framework for somatic variant classification using tabular features derived from variant call data sets. The  objective is to distinguish somatic vs germline variants in tumour-only sequencing data and to derive downstream metrics such as tumour mutational burden (TMB).
+This repository implements a machine learning pipeline for somatic variant classification using tabular features derived from variant call data sets. The  objective is to distinguish somatic vs germline variants in tumour-only sequencing data and to derive downstream metrics such as tumour mutational burden (TMB).
 
 The pipeline operates on annotated VCF files, generated using the mulo-wesml pipeline (https://github.com/lt11/mulo-wesml), ensuring consistency between upstream variant calling and downstream machine learning classification.
 
@@ -15,13 +15,13 @@ The pipeline performs:
 - One-hot encoding of categorical features
 - Biologically motivated filtering of germline variants
 - Training and evaluation of multiple ML models
-- Prediction across validation and external test cohorts
+- Prediction across validation and test cohorts
 
 ---
 
 ## Input Data
 
-The input VCF data can be prepared using e.g. the script "aux/prep-data.sh" after setting the folder paths in the "settings" section. 
+The input VCF data can be prepared using the script "aux/prep-data.sh" after setting the folder paths in the "settings" section. 
 
 A table with metadata (e.g. cancer type, sample identifier, sample ancestry), e.g. "tab/metadata.csv", is also needed.
 
@@ -106,6 +106,8 @@ Once you have prepared the VCF data with "prep-data.sh", running the script is a
 ```
 python unc-normal-drop-5.py
 ```
+
+Users can flexibly tailor the feature space by editing the "optional_drop_features" parameter defined at the beginning of the script. By specifying a list of feature names (e.g. ['CNT', 'DP', 'ontology_missense']), these variables will be excluded from the training and prediction matrices prior to model fitting. If set to ['none'], no additional features are removed beyond the default metadata columns. This design enables straightforward experimentation with feature selection strategies, allowing users to assess the impact of specific variables on model performance without modifying the core pipeline logic.
 
 ---
 
