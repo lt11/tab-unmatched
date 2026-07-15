@@ -1,7 +1,7 @@
 ### settings
 run_tab="run-68"
 pipe_type="mulo-wesone"
-${dir_base}=EDIT-ME        # path to the base directory where the data is stored
+dir_base=EDIT-ME        # path to the base directory where the data is stored
 cd ${dir_base}/$pipe_type
 
 ### data

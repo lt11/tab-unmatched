@@ -381,6 +381,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+if len(sys.argv) < 2:
+    raise SystemExit("Usage: python unc-normal-drop-5.py <seed>")
+seed = int(sys.argv[1])
+print("Using seed: " + str(seed))
+
 current_directory = os.getcwd()
 workspace = os.path.dirname(current_directory) + '/'
 
@@ -606,7 +611,8 @@ from xgboost import plot_importance
 ### create model instance
 bst = XGBClassifier(learning_rate=0.05, n_estimators=750, max_depth=30, 
                     eval_set=[(validation_X, validation_Y)],
-                    objective='binary:logistic')
+                    objective='binary:logistic',
+                    random_state=seed)
                     ### avoid overfit, if 10 round no improve, stop
                     ### early_stopping_rounds=10
 
@@ -735,7 +741,9 @@ from sklearn.metrics import mean_squared_error
 import seaborn as sns
 
 params = {'objective': 'binary','metric': 'auc', 'boosting_type': 'gbdt',
-          'num_leaves': 31, 'learning_rate': 0.05, 'feature_fraction': 0.9}
+          'num_leaves': 31, 'learning_rate': 0.05, 'feature_fraction': 0.9,
+          'seed': seed, 'feature_fraction_seed': seed,
+          'bagging_seed': seed, 'data_random_seed': seed}
 ### fit model
 gbm = lgb.train(params,
                lgb.Dataset(train_X.drop(columns=drop_cols), train_Y),
@@ -861,6 +869,9 @@ print('[test TNBC set] predicted nb of germline: '
 from pytorch_tabnet.tab_model import TabNetClassifier
 import torch
 
+np.random.seed(seed)
+torch.manual_seed(seed)
+
 X_train = train_X.drop(columns=drop_cols).to_numpy()
 Y_train = train_Y.to_numpy().squeeze()
 X_validation = validation_X.drop(columns=drop_cols).to_numpy()
@@ -878,7 +889,7 @@ classifier = TabNetClassifier(n_d=24, n_a=24, n_steps=4, gamma=1.5,
                               clip_value=2., optimizer_fn=torch.optim.Adam,
                               scheduler_params={"gamma": 0.95, "step_size": 20},
                               scheduler_fn=torch.optim.lr_scheduler.StepLR,
-                              epsilon=1e-15)
+                              epsilon=1e-15, seed=seed)
 
 classifier.fit(X_train=X_train, y_train=Y_train,
                eval_set=[(X_train, Y_train),
@@ -997,4 +1008,3 @@ validation_pred.to_csv(output_dir + '/preds-validation.csv', index = False)
 test_pred_m.to_csv(output_dir + '/preds-test-melanoma.csv', index = False)
 test_pred_mix.to_csv(output_dir + '/preds-test-mixtcga.csv', index = False)
 test_pred.to_csv(output_dir + '/preds-test-tnbc.csv', index = False)
-
