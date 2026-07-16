@@ -74,40 +74,62 @@ import seaborn as sns
 import pandas as pd
 import matplotlib.pyplot as plt
 ### all features
-def myplot_importance(feature_names, feature_importance, model_name,
-                      output_dir):
+def myplot_importance(feature_names, feature_importance, model_name, output_dir):
     ### make a DataFrame for better visualization
-    importance_df = pd.DataFrame({'Feature': feature_names, 'Importance':
-                                  feature_importance})
+    importances = np.array(feature_importance, dtype=float)
+    ### rename ontology_* features to o_*
+    feat_labels = []
+    for f in feature_names:
+        if isinstance(f, str) and f.startswith('ontology_'):
+            feat_labels.append('o_' + f[len('ontology_'):])
+        else:
+            feat_labels.append(f)
+    ### normalise importance values to [0, 1]
+    if importances.max() > 0:
+        importances = importances / importances.max()
+    importance_df = pd.DataFrame({'Feature': feat_labels,
+                                  'Importance': importances})
     ### sort the DataFrame by importance
     importance_df = importance_df.sort_values(by='Importance', ascending=False)
     ### plot the feature importance
     plt.figure(figsize=(10, 8))
     sns.barplot(x='Importance', y='Feature', data=importance_df, color='black')
-    plt.xlabel('Importance Score (a.u.)', fontsize=22)
+    plt.xlabel('Importance Score (normalised)', fontsize=22)
     plt.ylabel('Features', fontsize=22)
     plt.xticks(fontsize=8)
     plt.yticks(fontsize=5)
+    plt.xlim(0.0, 1.0)
     plt.tight_layout()
     plt.savefig(output_dir + '/importance-' + model_name + '.pdf')
     plt.show()
 
 ### number of top features to plot
 n_top_feat = 20
-def myplot_importance_top(feature_names, feature_importance, model_name,
-                          output_dir):
+def myplot_importance_top(feature_names, feature_importance, model_name, output_dir):
     ### make a DataFrame for better visualization
-    importance_df = pd.DataFrame({'Feature': feature_names, 'Importance':
-                                  feature_importance})
+    importances = np.array(feature_importance, dtype=float)
+    ### rename ontology_* features to o_*
+    feat_labels = []
+    for f in feature_names:
+        if isinstance(f, str) and f.startswith('ontology_'):
+            feat_labels.append('o_' + f[len('ontology_'):])
+        else:
+            feat_labels.append(f)
+    ### normalise importance values to [0, 1]
+    if importances.max() > 0:
+        importances = importances / importances.max()
+    importance_df = pd.DataFrame({'Feature': feat_labels,
+                                  'Importance': importances})
     ### sort the DataFrame by importance
     importance_df = importance_df.sort_values(by='Importance', ascending=False)
     ### plot the feature importance
     plt.figure(figsize=(10, 8))
     sns.barplot(x='Importance', y='Feature', data=importance_df, color='black')
-    plt.xlabel('Importance Score (a.u.)', fontsize=22)
+    plt.xlabel('Importance Score (normalised)', fontsize=22)
     plt.ylabel('Features', fontsize=22)
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=22)    
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=22)
+    plt.xlim(0.0, 1.0)
     plt.tight_layout()
     plt.savefig(output_dir + '/importance-' + model_name + '.pdf')
     plt.show()
@@ -359,6 +381,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+if len(sys.argv) < 2:
+    raise SystemExit("Usage: python unc-normal-drop-5.py <seed>")
+seed = int(sys.argv[1])
+print("Using seed: " + str(seed))
+
 current_directory = os.getcwd()
 workspace = os.path.dirname(current_directory) + '/'
 
@@ -573,6 +600,113 @@ else:
 drop_cols = [c for c in drop_cols if c in train_X.columns]
 print("Dropping columns:", drop_cols)
 
+## logistic regression ---------------------------------------------------------
+
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+logreg = make_pipeline(
+    StandardScaler(),
+    LogisticRegression(max_iter=5000, random_state=seed)
+)
+
+### fit model
+logreg.fit(train_X.drop(columns=drop_cols), train_Y)
+joblib.dump(logreg, output_dir + '/model-logistic-regression.pkl')
+
+### train
+preds_logreg = logreg.predict_proba(train_X.drop(columns=drop_cols))[:, 1]
+accuracy('logistic-regression-train', train_Y, preds_logreg)
+train_pred['logreg_preds'] = np.where(preds_logreg>0.5,
+                                      'somatic',
+                                      'germline')
+nb_germline = len(train_Y[train_Y==0])
+nb_somatic = len(train_Y[train_Y==1])
+nb_germline_pred = len(train_pred[train_pred['logreg_preds']=='germline'])
+nb_somatic_pred = len(train_pred[train_pred['logreg_preds']=='somatic'])
+print('[training set] real nb of germline: ' 
+      + str(nb_germline) 
+      + ', somatic: '
+      + str(nb_somatic))
+print('[training set] predicted nb of germline: ' 
+      + str(nb_germline_pred) 
+      + ', somatic: ' 
+      + str(nb_somatic_pred))
+
+### validate
+preds_logreg = logreg.predict_proba(validation_X.drop(columns=drop_cols))[:, 1]
+accuracy('logistic-regression-validation', validation_Y, preds_logreg)
+validation_pred['logreg_preds'] = np.where(preds_logreg>0.5,
+                                           'somatic',
+                                           'germline')
+nb_germline = len(validation_Y[validation_Y==0])
+nb_somatic = len(validation_Y[validation_Y==1])
+nb_germline_pred = len(validation_pred[validation_pred['logreg_preds']==
+                                       'germline'])
+nb_somatic_pred = len(validation_pred[validation_pred['logreg_preds']==
+                                      'somatic'])
+print('[validation set] real nb of germline: ' 
+      + str(nb_germline) 
+      + ', somatic: ' 
+      + str(nb_somatic))
+print('[validation set] predicted nb of germline: ' 
+      + str(nb_germline_pred) 
+      + ', somatic: ' 
+      + str(nb_somatic_pred))
+
+### test melanoma
+preds_logreg = logreg.predict_proba(test_X_m.drop(columns=drop_cols))[:, 1]
+accuracy('logistic-regression-test-melanoma', test_Y_m, preds_logreg)
+test_pred_m['logreg_preds'] = np.where(preds_logreg>0.5,
+                                       'somatic',
+                                       'germline')
+nb_germline = len(test_Y_m[test_Y_m==0])
+nb_somatic = len(test_Y_m[test_Y_m==1])
+nb_germline_pred = len(test_pred_m[test_pred_m['logreg_preds']=='germline'])
+nb_somatic_pred = len(test_pred_m[test_pred_m['logreg_preds']=='somatic'])
+print('[test melanoma set] real nb of germline: ' 
+      + str(nb_germline) 
+      + ', somatic: ' 
+      + str(nb_somatic))
+print('[test melanoma set] predicted nb of germline: ' 
+      + str(nb_germline_pred) 
+      + ', somatic: ' 
+      + str(nb_somatic_pred))
+
+### test mixtcga
+preds_logreg = logreg.predict_proba(test_X_mix.drop(columns=drop_cols))[:, 1]
+accuracy('logistic-regression-test-mixtcga', test_Y_mix, preds_logreg)
+test_pred_mix['logreg_preds'] = np.where(preds_logreg>0.5,
+                                         'somatic',
+                                         'germline')
+nb_germline = len(test_Y_mix[test_Y_mix==0])
+nb_somatic = len(test_Y_mix[test_Y_mix==1])
+nb_germline_pred = len(test_pred_mix[test_pred_mix['logreg_preds']==
+                                       'germline'])
+nb_somatic_pred = len(test_pred_mix[test_pred_mix['logreg_preds']==
+                                      'somatic'])
+print('[test mixtcga set] real nb of germline: ' 
+      + str(nb_germline) 
+      + ', somatic: ' 
+      + str(nb_somatic))
+print('[test mixtcga set] predicted nb of germline: ' 
+      + str(nb_germline_pred) 
+      + ', somatic: ' 
+      + str(nb_somatic_pred))
+
+### test tnbc data
+preds_logreg = logreg.predict_proba(test_X.drop(columns=drop_cols))[:, 1]
+test_pred['logreg_preds'] = np.where(preds_logreg>0.5,
+                                     'somatic',
+                                     'germline')
+nb_germline = len(test_pred[test_pred['logreg_preds']=='germline'])
+nb_somatic = len(test_pred[test_pred['logreg_preds']=='somatic'])
+print('[test TNBC set] predicted nb of germline: ' 
+      + str(nb_germline) 
+      + ', somatic: ' 
+      + str(nb_somatic))
+
 ## xgboost ---------------------------------------------------------------------
 
 ### pip install xgboost
@@ -584,7 +718,8 @@ from xgboost import plot_importance
 ### create model instance
 bst = XGBClassifier(learning_rate=0.05, n_estimators=750, max_depth=30, 
                     eval_set=[(validation_X, validation_Y)],
-                    objective='binary:logistic')
+                    objective='binary:logistic',
+                    random_state=seed)
                     ### avoid overfit, if 10 round no improve, stop
                     ### early_stopping_rounds=10
 
@@ -713,7 +848,9 @@ from sklearn.metrics import mean_squared_error
 import seaborn as sns
 
 params = {'objective': 'binary','metric': 'auc', 'boosting_type': 'gbdt',
-          'num_leaves': 31, 'learning_rate': 0.05, 'feature_fraction': 0.9}
+          'num_leaves': 31, 'learning_rate': 0.05, 'feature_fraction': 0.9,
+          'seed': seed, 'feature_fraction_seed': seed,
+          'bagging_seed': seed, 'data_random_seed': seed}
 ### fit model
 gbm = lgb.train(params,
                lgb.Dataset(train_X.drop(columns=drop_cols), train_Y),
@@ -839,6 +976,9 @@ print('[test TNBC set] predicted nb of germline: '
 from pytorch_tabnet.tab_model import TabNetClassifier
 import torch
 
+np.random.seed(seed)
+torch.manual_seed(seed)
+
 X_train = train_X.drop(columns=drop_cols).to_numpy()
 Y_train = train_Y.to_numpy().squeeze()
 X_validation = validation_X.drop(columns=drop_cols).to_numpy()
@@ -856,7 +996,7 @@ classifier = TabNetClassifier(n_d=24, n_a=24, n_steps=4, gamma=1.5,
                               clip_value=2., optimizer_fn=torch.optim.Adam,
                               scheduler_params={"gamma": 0.95, "step_size": 20},
                               scheduler_fn=torch.optim.lr_scheduler.StepLR,
-                              epsilon=1e-15)
+                              epsilon=1e-15, seed=seed)
 
 classifier.fit(X_train=X_train, y_train=Y_train,
                eval_set=[(X_train, Y_train),
@@ -975,4 +1115,3 @@ validation_pred.to_csv(output_dir + '/preds-validation.csv', index = False)
 test_pred_m.to_csv(output_dir + '/preds-test-melanoma.csv', index = False)
 test_pred_mix.to_csv(output_dir + '/preds-test-mixtcga.csv', index = False)
 test_pred.to_csv(output_dir + '/preds-test-tnbc.csv', index = False)
-
