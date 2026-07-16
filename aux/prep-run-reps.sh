@@ -4,7 +4,7 @@ run_tab="run-71a"
 pipe_type="mulo-wesml"
 ### path to the base directory where the data is stored
 dir_base="/data/ssd/lorenzot/prog"
-cd ${dir_base}/${pipe_type}
+cd "${dir_base}/${pipe_type}"
 
 ### data
 tar -czf train-vcf.tgz \
@@ -22,64 +22,64 @@ tar -czf test-mixtcga.tgz \
 tar -czf test-tnbc.tgz ../tnbc/run-1/var-calls/anno-snpeff-unc/*dbs.vcf.gz &
 
 wait
-mv *tgz ${dir_base}/tab-ml
+mv *tgz "${dir_base}/tab-ml"
 
 ## clmnt ----------------------------------------------------------------------
 
 ### tab-ml
-cd ${dir_base}/tab-ml
-mkdir -p ${dir_base}/tab-ml/${run_tab}/train
-mkdir -p ${dir_base}/tab-ml/${run_tab}/validation
-mkdir -p ${dir_base}/tab-ml/${run_tab}/test/melanoma
-mkdir -p ${dir_base}/tab-ml/${run_tab}/test/mixtcga
-mkdir -p ${dir_base}/tab-ml/${run_tab}/test/tnbc
+cd "${dir_base}/tab-ml"
+mkdir -p "${dir_base}/tab-ml/${run_tab}/train"
+mkdir -p "${dir_base}/tab-ml/${run_tab}/validation"
+mkdir -p "${dir_base}/tab-ml/${run_tab}/test/melanoma"
+mkdir -p "${dir_base}/tab-ml/${run_tab}/test/mixtcga"
+mkdir -p "${dir_base}/tab-ml/${run_tab}/test/tnbc"
 
-cd ${dir_base}/tab-ml/
-mv train-vcf.tgz ${dir_base}/tab-ml/${run_tab}/train
-cd ${dir_base}/tab-ml/${run_tab}/train
+cd "${dir_base}/tab-ml/"
+mv train-vcf.tgz "${dir_base}/tab-ml/${run_tab}/train"
+cd "${dir_base}/tab-ml/${run_tab}/train"
 tar -zvxf train-vcf.tgz
 mv run-*/var-calls/gt/*vcf.gz .
 rm -rf train-vcf.tgz 
 gunzip *vcf.gz
 
-cd ${dir_base}/tab-ml/
-mv valid-vcf.tgz ${dir_base}/tab-ml/${run_tab}/validation
-cd ${dir_base}/tab-ml/${run_tab}/validation
+cd "${dir_base}/tab-ml/"
+mv valid-vcf.tgz "${dir_base}/tab-ml/${run_tab}/validation"
+cd "${dir_base}/tab-ml/${run_tab}/validation"
 tar -zvxf valid-vcf.tgz
 mv run-*/var-calls/gt/*vcf.gz .
 rm -rf valid-vcf.tgz
 gunzip *vcf.gz
 
-cd ${dir_base}/tab-ml/
-mv test-metmel.tgz ${dir_base}/tab-ml/${run_tab}/test/melanoma
-cd ${dir_base}/tab-ml/${run_tab}/test/melanoma
+cd "${dir_base}/tab-ml/"
+mv test-metmel.tgz "${dir_base}/tab-ml/${run_tab}/test/melanoma"
+cd "${dir_base}/tab-ml/${run_tab}/test/melanoma"
 tar -zvxf test-metmel.tgz
 mv run-*/var-calls/gt/*vcf.gz .
 rm -rf test-metmel.tgz
 gunzip *vcf.gz
 
-cd ${dir_base}/tab-ml/
-mv test-mixtcga.tgz ${dir_base}/tab-ml/${run_tab}/test/mixtcga
-cd ${dir_base}/tab-ml/${run_tab}/test/mixtcga
+cd "${dir_base}/tab-ml/"
+mv test-mixtcga.tgz "${dir_base}/tab-ml/${run_tab}/test/mixtcga"
+cd "${dir_base}/tab-ml/${run_tab}/test/mixtcga"
 tar -zvxf test-mixtcga.tgz  
 mv run-*/var-calls/gt/*vcf.gz .
 rm -rf test-mixtcga.tgz
 gunzip *vcf.gz
 
-cd ${dir_base}/tab-ml
-mv test-tnbc.tgz ${dir_base}/tab-ml/${run_tab}/test/tnbc
-cd ${dir_base}/tab-ml/${run_tab}/test/tnbc
+cd "${dir_base}/tab-ml"
+mv test-tnbc.tgz "${dir_base}/tab-ml/${run_tab}/test/tnbc"
+cd "${dir_base}/tab-ml/${run_tab}/test/tnbc"
 tar -zvxf test-tnbc.tgz
 mv tnbc/run-*/var-calls/anno-snpeff-unc/*dbs.vcf.gz .
 rm -rf test-tnbc.tgz
 gunzip *vcf.gz
 
-cd ${dir_base}  
+cd "${dir_base}"
 if [ ! -d "./tab-ml/${run_tab}/tab" ]; then
 	dir_tab=$(find ./tab-ml -name tab | tail -1)
-	cp -r ${dir_tab} ./tab-ml/${run_tab}
+	cp -r "${dir_tab}" "./tab-ml/${run_tab}"
 fi
-cd ./tab-ml/${run_tab}
+cd "./tab-ml/${run_tab}"
 
 ### set seed
 all_seeds=(21709 11796 17856 24207 12554)
@@ -87,7 +87,7 @@ all_seeds=(21709 11796 17856 24207 12554)
 ### run a
 ind_run=0
 cd scr
-python unc-normal-drop-6.py ${all_seeds[ind_run]} > log-unc-normal-drop-6.txt
+python unc-normal-drop-6.py "${all_seeds[ind_run]}" > log-unc-normal-drop-6.txt
 cd ../aux
 Rscript make-score.R > log-make-score.txt
 Rscript calculate-tmb.R 
@@ -149,7 +149,7 @@ for ind_rep in b c d e; do
   ind_run=$((ind_run + 1))
   echo "Running $(basename "${dir_run_new}") with seed ${all_seeds[ind_run]}"
   cd "${dir_run_new}/scr"
-  python unc-normal-drop-6.py ${all_seeds[ind_run]} > log-unc-normal-drop-6.txt
+  python unc-normal-drop-6.py "${all_seeds[ind_run]}" > log-unc-normal-drop-6.txt
 
   cd "${dir_run_new}/aux"
   Rscript make-score.R > log-make-score.txt
