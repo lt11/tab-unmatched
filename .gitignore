@@ -7,4 +7,5 @@ train
 validation
 .DS_Store
 aux/.Rhistory
+.lintr
 
