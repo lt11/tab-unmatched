@@ -2,11 +2,11 @@
 
 run_tab="run-71a"
 pipe_type="mulo-wesml"
-### path to the base directory where the data is stored
+### path to the base directory where the variants are stored
 dir_base="/data/ssd/lorenzot/prog"
 cd "${dir_base}/${pipe_type}"
 
-### data
+### variants
 tar -czf train-vcf.tgz \
   run-7/var-calls/gt/*.vcf.gz \
   run-8/var-calls/gt/*.vcf.gz \
