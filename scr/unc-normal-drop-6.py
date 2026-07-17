@@ -381,10 +381,28 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+### argument parsing
+def parse_bool(value):
+    value = value.lower()
+    if value in ('true', 't', '1', 'yes', 'y'):
+        return True
+    if value in ('false', 'f', '0', 'no', 'n'):
+        return False
+    raise ValueError("Expected true/false, 1/0, or yes/no")
+
 if len(sys.argv) < 2:
-    raise SystemExit("Usage: python unc-normal-drop-5.py <seed>")
+    raise SystemExit("Usage: python unc-normal-drop-6.py <seed> [run_logit]")
+
 seed = int(sys.argv[1])
 print("Using seed: " + str(seed))
+### default value for the logistic regression model
+run_logit = True
+if len(sys.argv) >= 3:
+    try:
+        run_logit = parse_bool(sys.argv[2])
+    except ValueError as exc:
+        raise SystemExit("Invalid run_logit value: " + str(exc))
+print("Using run_logit: " + str(run_logit))
 
 current_directory = os.getcwd()
 workspace = os.path.dirname(current_directory) + '/'
@@ -602,113 +620,121 @@ print("Dropping columns:", drop_cols)
 
 ## logistic regression ---------------------------------------------------------
 
-from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
+if run_logit:
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
 
-logreg_feature_cols = ['CNT', 'pop_max']
-print("Logistic regression columns:", logreg_feature_cols)
+    logreg_feature_cols = ['CNT', 'pop_max']
+    print("Logistic regression columns:", logreg_feature_cols)
 
-logreg = make_pipeline(
-    StandardScaler(),
-    LogisticRegression(max_iter=5000, random_state=seed)
-)
+    logreg = make_pipeline(
+        StandardScaler(),
+        LogisticRegression(max_iter=5000, random_state=seed)
+    )
 
-### fit model
-logreg.fit(train_X[logreg_feature_cols], train_Y)
-joblib.dump(logreg, output_dir + '/model-logistic-regression.pkl')
+    ### fit model
+    logreg.fit(train_X[logreg_feature_cols], train_Y)
+    joblib.dump(logreg, output_dir + '/model-logistic-regression.pkl')
 
-### train
-preds_logreg = logreg.predict_proba(train_X[logreg_feature_cols])[:, 1]
-accuracy('logistic-regression-train', train_Y, preds_logreg)
-train_pred['logreg_preds'] = np.where(preds_logreg>0.5,
-                                      'somatic',
-                                      'germline')
-nb_germline = len(train_Y[train_Y==0])
-nb_somatic = len(train_Y[train_Y==1])
-nb_germline_pred = len(train_pred[train_pred['logreg_preds']=='germline'])
-nb_somatic_pred = len(train_pred[train_pred['logreg_preds']=='somatic'])
-print('[training set] real nb of germline: ' 
-      + str(nb_germline) 
-      + ', somatic: '
-      + str(nb_somatic))
-print('[training set] predicted nb of germline: ' 
-      + str(nb_germline_pred) 
-      + ', somatic: ' 
-      + str(nb_somatic_pred))
+    ### train
+    preds_logreg = logreg.predict_proba(train_X[logreg_feature_cols])[:, 1]
+    accuracy('logistic-regression-train', train_Y, preds_logreg)
+    train_pred['logreg_preds'] = np.where(preds_logreg>0.5,
+                                          'somatic',
+                                          'germline')
+    nb_germline = len(train_Y[train_Y==0])
+    nb_somatic = len(train_Y[train_Y==1])
+    nb_germline_pred = len(train_pred[train_pred['logreg_preds']=='germline'])
+    nb_somatic_pred = len(train_pred[train_pred['logreg_preds']=='somatic'])
+    print('[training set] real nb of germline: ' 
+          + str(nb_germline) 
+          + ', somatic: '
+          + str(nb_somatic))
+    print('[training set] predicted nb of germline: ' 
+          + str(nb_germline_pred) 
+          + ', somatic: ' 
+          + str(nb_somatic_pred))
 
-### validate
-preds_logreg = logreg.predict_proba(validation_X[logreg_feature_cols])[:, 1]
-accuracy('logistic-regression-validation', validation_Y, preds_logreg)
-validation_pred['logreg_preds'] = np.where(preds_logreg>0.5,
+    ### validate
+    preds_logreg = logreg.predict_proba(validation_X[logreg_feature_cols])[:, 1]
+    accuracy('logistic-regression-validation', validation_Y, preds_logreg)
+    validation_pred['logreg_preds'] = np.where(preds_logreg>0.5,
+                                               'somatic',
+                                               'germline')
+    nb_germline = len(validation_Y[validation_Y==0])
+    nb_somatic = len(validation_Y[validation_Y==1])
+    nb_germline_pred = len(validation_pred[validation_pred['logreg_preds']==
+                                           'germline'])
+    nb_somatic_pred = len(validation_pred[validation_pred['logreg_preds']==
+                                          'somatic'])
+    print('[validation set] real nb of germline: ' 
+          + str(nb_germline) 
+          + ', somatic: ' 
+          + str(nb_somatic))
+    print('[validation set] predicted nb of germline: ' 
+          + str(nb_germline_pred) 
+          + ', somatic: ' 
+          + str(nb_somatic_pred))
+
+    ### test melanoma
+    preds_logreg = logreg.predict_proba(test_X_m[logreg_feature_cols])[:, 1]
+    accuracy('logistic-regression-test-melanoma', test_Y_m, preds_logreg)
+    test_pred_m['logreg_preds'] = np.where(preds_logreg>0.5,
                                            'somatic',
                                            'germline')
-nb_germline = len(validation_Y[validation_Y==0])
-nb_somatic = len(validation_Y[validation_Y==1])
-nb_germline_pred = len(validation_pred[validation_pred['logreg_preds']==
-                                       'germline'])
-nb_somatic_pred = len(validation_pred[validation_pred['logreg_preds']==
-                                      'somatic'])
-print('[validation set] real nb of germline: ' 
-      + str(nb_germline) 
-      + ', somatic: ' 
-      + str(nb_somatic))
-print('[validation set] predicted nb of germline: ' 
-      + str(nb_germline_pred) 
-      + ', somatic: ' 
-      + str(nb_somatic_pred))
+    nb_germline = len(test_Y_m[test_Y_m==0])
+    nb_somatic = len(test_Y_m[test_Y_m==1])
+    nb_germline_pred = len(test_pred_m[test_pred_m['logreg_preds']=='germline'])
+    nb_somatic_pred = len(test_pred_m[test_pred_m['logreg_preds']=='somatic'])
+    print('[test melanoma set] real nb of germline: ' 
+          + str(nb_germline) 
+          + ', somatic: ' 
+          + str(nb_somatic))
+    print('[test melanoma set] predicted nb of germline: ' 
+          + str(nb_germline_pred) 
+          + ', somatic: ' 
+          + str(nb_somatic_pred))
 
-### test melanoma
-preds_logreg = logreg.predict_proba(test_X_m[logreg_feature_cols])[:, 1]
-accuracy('logistic-regression-test-melanoma', test_Y_m, preds_logreg)
-test_pred_m['logreg_preds'] = np.where(preds_logreg>0.5,
-                                       'somatic',
-                                       'germline')
-nb_germline = len(test_Y_m[test_Y_m==0])
-nb_somatic = len(test_Y_m[test_Y_m==1])
-nb_germline_pred = len(test_pred_m[test_pred_m['logreg_preds']=='germline'])
-nb_somatic_pred = len(test_pred_m[test_pred_m['logreg_preds']=='somatic'])
-print('[test melanoma set] real nb of germline: ' 
-      + str(nb_germline) 
-      + ', somatic: ' 
-      + str(nb_somatic))
-print('[test melanoma set] predicted nb of germline: ' 
-      + str(nb_germline_pred) 
-      + ', somatic: ' 
-      + str(nb_somatic_pred))
+    ### test mixtcga
+    preds_logreg = logreg.predict_proba(test_X_mix[logreg_feature_cols])[:, 1]
+    accuracy('logistic-regression-test-mixtcga', test_Y_mix, preds_logreg)
+    test_pred_mix['logreg_preds'] = np.where(preds_logreg>0.5,
+                                             'somatic',
+                                             'germline')
+    nb_germline = len(test_Y_mix[test_Y_mix==0])
+    nb_somatic = len(test_Y_mix[test_Y_mix==1])
+    nb_germline_pred = len(test_pred_mix[test_pred_mix['logreg_preds']==
+                                           'germline'])
+    nb_somatic_pred = len(test_pred_mix[test_pred_mix['logreg_preds']==
+                                          'somatic'])
+    print('[test mixtcga set] real nb of germline: ' 
+          + str(nb_germline) 
+          + ', somatic: ' 
+          + str(nb_somatic))
+    print('[test mixtcga set] predicted nb of germline: ' 
+          + str(nb_germline_pred) 
+          + ', somatic: ' 
+          + str(nb_somatic_pred))
 
-### test mixtcga
-preds_logreg = logreg.predict_proba(test_X_mix[logreg_feature_cols])[:, 1]
-accuracy('logistic-regression-test-mixtcga', test_Y_mix, preds_logreg)
-test_pred_mix['logreg_preds'] = np.where(preds_logreg>0.5,
+    ### test tnbc data
+    preds_logreg = logreg.predict_proba(test_X[logreg_feature_cols])[:, 1]
+    test_pred['logreg_preds'] = np.where(preds_logreg>0.5,
                                          'somatic',
                                          'germline')
-nb_germline = len(test_Y_mix[test_Y_mix==0])
-nb_somatic = len(test_Y_mix[test_Y_mix==1])
-nb_germline_pred = len(test_pred_mix[test_pred_mix['logreg_preds']==
-                                       'germline'])
-nb_somatic_pred = len(test_pred_mix[test_pred_mix['logreg_preds']==
-                                      'somatic'])
-print('[test mixtcga set] real nb of germline: ' 
-      + str(nb_germline) 
-      + ', somatic: ' 
-      + str(nb_somatic))
-print('[test mixtcga set] predicted nb of germline: ' 
-      + str(nb_germline_pred) 
-      + ', somatic: ' 
-      + str(nb_somatic_pred))
-
-### test tnbc data
-preds_logreg = logreg.predict_proba(test_X[logreg_feature_cols])[:, 1]
-test_pred['logreg_preds'] = np.where(preds_logreg>0.5,
-                                     'somatic',
-                                     'germline')
-nb_germline = len(test_pred[test_pred['logreg_preds']=='germline'])
-nb_somatic = len(test_pred[test_pred['logreg_preds']=='somatic'])
-print('[test TNBC set] predicted nb of germline: ' 
-      + str(nb_germline) 
-      + ', somatic: ' 
-      + str(nb_somatic))
+    nb_germline = len(test_pred[test_pred['logreg_preds']=='germline'])
+    nb_somatic = len(test_pred[test_pred['logreg_preds']=='somatic'])
+    print('[test TNBC set] predicted nb of germline: ' 
+          + str(nb_germline) 
+          + ', somatic: ' 
+          + str(nb_somatic))
+else:
+    print("Skipping logistic regression because run_logit is False")
+    train_pred['logreg_preds'] = 'NA'
+    validation_pred['logreg_preds'] = 'NA'
+    test_pred_m['logreg_preds'] = 'NA'
+    test_pred_mix['logreg_preds'] = 'NA'
+    test_pred['logreg_preds'] = 'NA'
 
 ## xgboost ---------------------------------------------------------------------
 

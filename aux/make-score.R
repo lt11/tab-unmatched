@@ -128,21 +128,35 @@ for (indL in strSets) {
   cat("[", myName, "] ",
       "TabNet NPV: ", valNPV, "\n", sep = "")
 
-  nG <- length(which(dtPred$logreg_preds == "germline"))
-  nS <- length(which(dtPred$logreg_preds == "somatic"))
-  nTP <- length(which(dtPred$target == 1
-                      & dtPred$logreg_preds == "somatic"))
-  nFN <- length(which(dtPred$target == 1
-                      & dtPred$logreg_preds == "germline"))
-  nTN <- length(which(dtPred$target == 0
-                      & dtPred$logreg_preds == "germline"))
-  nFP <- length(which(dtPred$target == 0
-                      & dtPred$logreg_preds == "somatic"))
-  valPrec <- nTP / (nTP + nFP)
-  valReca <- nTP / (nTP + nFN)
-  valAcc <- (nTP + nTN) / (nTP + nTN + nFP + nFN)
-  valTNR <- nTN / (nTN + nFP)
-  valNPV <- nTN / (nTN + nFN)
+  if (all(is.na(dtPred$logreg_preds))) {
+    nG <- NA
+    nS <- NA
+    nTP <- NA
+    nFN <- NA
+    nTN <- NA
+    nFP <- NA
+    valPrec <- NA
+    valReca <- NA
+    valAcc <- NA
+    valTNR <- NA
+    valNPV <- NA
+  } else {
+    nG <- length(which(dtPred$logreg_preds == "germline"))
+    nS <- length(which(dtPred$logreg_preds == "somatic"))
+    nTP <- length(which(dtPred$target == 1
+                        & dtPred$logreg_preds == "somatic"))
+    nFN <- length(which(dtPred$target == 1
+                        & dtPred$logreg_preds == "germline"))
+    nTN <- length(which(dtPred$target == 0
+                        & dtPred$logreg_preds == "germline"))
+    nFP <- length(which(dtPred$target == 0
+                        & dtPred$logreg_preds == "somatic"))
+    valPrec <- nTP / (nTP + nFP)
+    valReca <- nTP / (nTP + nFN)
+    valAcc <- (nTP + nTN) / (nTP + nTN + nFP + nFN)
+    valTNR <- nTN / (nTN + nFP)
+    valNPV <- nTN / (nTN + nFN)
+  }
   oneRow <- c(oneRow, nG, nS, nTP, nTN, nFP, nFN,
               valPrec, valReca, valAcc, valTNR, valNPV)
   cat("[", myName, "] ",
