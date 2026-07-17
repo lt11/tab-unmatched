@@ -6,3 +6,5 @@ test
 train
 validation
 .DS_Store
+aux/.Rhistory
+

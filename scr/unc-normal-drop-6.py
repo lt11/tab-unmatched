@@ -606,17 +606,20 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+logreg_feature_cols = ['CNT', 'pop_max']
+print("Logistic regression columns:", logreg_feature_cols)
+
 logreg = make_pipeline(
     StandardScaler(),
     LogisticRegression(max_iter=5000, random_state=seed)
 )
 
 ### fit model
-logreg.fit(train_X.drop(columns=drop_cols), train_Y)
+logreg.fit(train_X[logreg_feature_cols], train_Y)
 joblib.dump(logreg, output_dir + '/model-logistic-regression.pkl')
 
 ### train
-preds_logreg = logreg.predict_proba(train_X.drop(columns=drop_cols))[:, 1]
+preds_logreg = logreg.predict_proba(train_X[logreg_feature_cols])[:, 1]
 accuracy('logistic-regression-train', train_Y, preds_logreg)
 train_pred['logreg_preds'] = np.where(preds_logreg>0.5,
                                       'somatic',
@@ -635,7 +638,7 @@ print('[training set] predicted nb of germline: '
       + str(nb_somatic_pred))
 
 ### validate
-preds_logreg = logreg.predict_proba(validation_X.drop(columns=drop_cols))[:, 1]
+preds_logreg = logreg.predict_proba(validation_X[logreg_feature_cols])[:, 1]
 accuracy('logistic-regression-validation', validation_Y, preds_logreg)
 validation_pred['logreg_preds'] = np.where(preds_logreg>0.5,
                                            'somatic',
@@ -656,7 +659,7 @@ print('[validation set] predicted nb of germline: '
       + str(nb_somatic_pred))
 
 ### test melanoma
-preds_logreg = logreg.predict_proba(test_X_m.drop(columns=drop_cols))[:, 1]
+preds_logreg = logreg.predict_proba(test_X_m[logreg_feature_cols])[:, 1]
 accuracy('logistic-regression-test-melanoma', test_Y_m, preds_logreg)
 test_pred_m['logreg_preds'] = np.where(preds_logreg>0.5,
                                        'somatic',
@@ -675,7 +678,7 @@ print('[test melanoma set] predicted nb of germline: '
       + str(nb_somatic_pred))
 
 ### test mixtcga
-preds_logreg = logreg.predict_proba(test_X_mix.drop(columns=drop_cols))[:, 1]
+preds_logreg = logreg.predict_proba(test_X_mix[logreg_feature_cols])[:, 1]
 accuracy('logistic-regression-test-mixtcga', test_Y_mix, preds_logreg)
 test_pred_mix['logreg_preds'] = np.where(preds_logreg>0.5,
                                          'somatic',
@@ -696,7 +699,7 @@ print('[test mixtcga set] predicted nb of germline: '
       + str(nb_somatic_pred))
 
 ### test tnbc data
-preds_logreg = logreg.predict_proba(test_X.drop(columns=drop_cols))[:, 1]
+preds_logreg = logreg.predict_proba(test_X[logreg_feature_cols])[:, 1]
 test_pred['logreg_preds'] = np.where(preds_logreg>0.5,
                                      'somatic',
                                      'germline')
