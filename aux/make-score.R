@@ -127,8 +127,8 @@ for (indL in strSets) {
       "TabNet TNR: ", valTNR, "\n", sep = "")
   cat("[", myName, "] ",
       "TabNet NPV: ", valNPV, "\n", sep = "")
-
-  if (all(is.na(dtPred$logreg_preds))) {
+  if (!"logreg_preds" %in% colnames(dtPred)
+      || all(is.na(dtPred$logreg_preds))) {
     nG <- NA
     nS <- NA
     nTP <- NA
