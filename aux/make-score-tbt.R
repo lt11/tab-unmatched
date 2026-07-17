@@ -150,12 +150,60 @@ for (indL in strSets) {
         "TabNet TNR: ", valTNR, "\n", sep = "")
     cat("[", myName, "] ",
         "TabNet NPV: ", valNPV, "\n", sep = "")
+
+    if (!"logreg_preds" %in% colnames(dtPred)
+        || all(is.na(dtPred$logreg_preds))) {
+      nG <- NA
+      nS <- NA
+      nTP <- NA
+      nFN <- NA
+      nTN <- NA
+      nFP <- NA
+      valPrec <- NA
+      valReca <- NA
+      valAcc <- NA
+      valTNR <- NA
+      valNPV <- NA
+    } else {
+      nG <- length(which(dtPred$logreg_preds == "germline"
+                         & dtPred$subtype == indT))
+      nS <- length(which(dtPred$logreg_preds == "somatic"
+                         & dtPred$subtype == indT))
+      nTP <- length(which(dtPred$target == 1
+                          & dtPred$logreg_preds == "somatic"
+                          & dtPred$subtype == indT))
+      nFN <- length(which(dtPred$target == 1
+                          & dtPred$logreg_preds == "germline"
+                          & dtPred$subtype == indT))
+      nTN <- length(which(dtPred$target == 0
+                          & dtPred$logreg_preds == "germline"
+                          & dtPred$subtype == indT))
+      nFP <- length(which(dtPred$target == 0
+                          & dtPred$logreg_preds == "somatic"
+                          & dtPred$subtype == indT))
+      valPrec <- nTP / (nTP + nFP)
+      valReca <- nTP / (nTP + nFN)
+      valAcc <- (nTP + nTN) / (nTP + nTN + nFP + nFN)
+      valTNR <- nTN / (nTN + nFP)
+      valNPV <- nTN / (nTN + nFN)
+    }
+    oneRow <- c(oneRow, nG, nS, nTP, nTN, nFP, nFN,
+                valPrec, valReca, valAcc, valTNR, valNPV)
+    cat("[", myName, "] ",
+        "LogiRegr precision: ", valPrec, "\n", sep = "")
+    cat("[", myName, "] ",
+        "LogiRegr recall: ", valReca, "\n", sep = "")
+    cat("[", myName, "] ",
+        "LogiRegr accuracy: ", valAcc, "\n", sep = "")
+    cat("[", myName, "] ",
+        "LogiRegr TNR: ", valTNR, "\n", sep = "")
+    cat("[", myName, "] ",
+        "LogiRegr NPV: ", valNPV, "\n", sep = "")
     
     ## append metrics -----------------------------------------------------------
     
     dtScores <- rbindlist(list(dtScores, as.data.table(as.list(oneRow))),
                           use.names = F, fill = T)
-    
   }
 }
 colnames(dtScores) <- c(
@@ -195,7 +243,18 @@ colnames(dtScores) <- c(
   "Recall (TabNet)",
   "Accuracy (TabNet)",
   "TNR (TabNet)",
-  "NPV (TabNet)")
+  "NPV (TabNet)",
+  "Germline (LogiRegr)",
+  "Somatic (LogiRegr)",
+  "TP (LogiRegr)",
+  "TN (LogiRegr)",
+  "FP (LogiRegr)",
+  "FN (LogiRegr)",
+  "Precision (LogiRegr)",
+  "Recall (LogiRegr)",
+  "Accuracy (LogiRegr)",
+  "TNR (LogiRegr)",
+  "NPV (LogiRegr)")
 dtScores[Data == "metastatic melanoma", Data := "MM"]
 
 fwrite(dtScores, file = file.path(dirData, "scores-tbt.txt"),
