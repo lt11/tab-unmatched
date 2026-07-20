@@ -375,8 +375,9 @@ def extract_feature(raw, mode, output_dir):
 
 ## common data -----------------------------------------------------------------
 
+import argparse
 import pandas as pd
-import sys, csv, os, re
+import csv, os, re
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -388,25 +389,21 @@ def parse_bool(value):
         return True
     if value in ('false', 'f', '0', 'no', 'n'):
         return False
-    raise ValueError("Expected true/false, 1/0, or yes/no")
+    raise argparse.ArgumentTypeError("Expected true/false, 1/0, or yes/no")
 
-if len(sys.argv) < 2:
-    raise SystemExit("Usage: python unc-normal-drop-6.py <seed> [run_logit]")
+parser = argparse.ArgumentParser()
+parser.add_argument("seed", type=int)
+parser.add_argument("run_logit", nargs="?", type=parse_bool, default=True)
+args = parser.parse_args()
 
-seed = int(sys.argv[1])
+seed = args.seed
 print("Using seed: " + str(seed))
-### default value for the logistic regression model
-run_logit = True
-if len(sys.argv) >= 3:
-    try:
-        run_logit = parse_bool(sys.argv[2])
-    except ValueError as exc:
-        raise SystemExit("Invalid run_logit value: " + str(exc))
+run_logit = args.run_logit
 print("Using run_logit: " + str(run_logit))
 
+### folder structure
 current_directory = os.getcwd()
 workspace = os.path.dirname(current_directory) + '/'
-
 output_dir = workspace + 'res/'
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
