@@ -393,13 +393,16 @@ def parse_bool(value):
 
 parser = argparse.ArgumentParser()
 parser.add_argument("seed", type=int)
-parser.add_argument("run_logit", nargs="?", type=parse_bool, default=True)
+parser.add_argument("run_logit", nargs="?", type=parse_bool, default=False)
+parser.add_argument("run_hf", nargs="?", type=parse_bool, default=False)
 args = parser.parse_args()
 
 seed = args.seed
 print("Using seed: " + str(seed))
 run_logit = args.run_logit
 print("Using run_logit: " + str(run_logit))
+run_hf = args.run_hf
+print("Using run_hf: " + str(run_hf))
 
 ### folder structure
 current_directory = os.getcwd()
@@ -614,6 +617,81 @@ else:
 ### keep only columns that exist in the current DataFrame
 drop_cols = [c for c in drop_cols if c in train_X.columns]
 print("Dropping columns:", drop_cols)
+
+## hard-filter naive classifier ------------------------------------------------
+
+val_cnt = 1
+val_pop_max = 0.001
+
+def predict_hard_filter(features):
+    return np.where((features['CNT'] > val_cnt) &
+                    (features['pop_max'] < val_pop_max),
+                    1,
+                    0)
+
+def add_hard_filter_predictions(pred_df, features):
+    preds = predict_hard_filter(features)
+    pred_df['hf_preds'] = np.where(preds == 1,
+                                   'somatic',
+                                   'germline')
+    return preds
+
+def report_prediction_counts(set_name, labels, pred_df, pred_col):
+    if labels is not None:
+        nb_germline = len(labels[labels==0])
+        nb_somatic = len(labels[labels==1])
+        print('[' + set_name + ' set] real nb of germline: '
+              + str(nb_germline)
+              + ', somatic: '
+              + str(nb_somatic))
+
+    nb_germline_pred = len(pred_df[pred_df[pred_col]=='germline'])
+    nb_somatic_pred = len(pred_df[pred_df[pred_col]=='somatic'])
+    print('[' + set_name + ' set] predicted nb of germline: '
+          + str(nb_germline_pred)
+          + ', somatic: '
+          + str(nb_somatic_pred))
+
+if run_hf:
+    print("Hard-filter classifier: somatic if CNT > "
+          + str(val_cnt)
+          + " and pop_max < "
+          + str(val_pop_max))
+
+    ### train
+    preds_hard_filter = add_hard_filter_predictions(train_pred, train_X)
+    accuracy('hard-filter-train', train_Y, preds_hard_filter)
+    report_prediction_counts('training', train_Y, train_pred, 'hf_preds')
+
+    ### validate
+    preds_hard_filter = add_hard_filter_predictions(validation_pred,
+                                                    validation_X)
+    accuracy('hard-filter-validation', validation_Y, preds_hard_filter)
+    report_prediction_counts('validation', validation_Y, validation_pred,
+                             'hf_preds')
+
+    ### test melanoma
+    preds_hard_filter = add_hard_filter_predictions(test_pred_m, test_X_m)
+    accuracy('hard-filter-test-melanoma', test_Y_m, preds_hard_filter)
+    report_prediction_counts('test melanoma', test_Y_m, test_pred_m,
+                             'hf_preds')
+
+    ### test mixtcga
+    preds_hard_filter = add_hard_filter_predictions(test_pred_mix, test_X_mix)
+    accuracy('hard-filter-test-mixtcga', test_Y_mix, preds_hard_filter)
+    report_prediction_counts('test mixtcga', test_Y_mix, test_pred_mix,
+                             'hf_preds')
+
+    ### test tnbc data
+    add_hard_filter_predictions(test_pred, test_X)
+    report_prediction_counts('test TNBC', None, test_pred, 'hf_preds')
+else:
+    print("Skipping hard-filter classifier because run_hf is False")
+    train_pred['hf_preds'] = 'NA'
+    validation_pred['hf_preds'] = 'NA'
+    test_pred_m['hf_preds'] = 'NA'
+    test_pred_mix['hf_preds'] = 'NA'
+    test_pred['hf_preds'] = 'NA'
 
 ## logistic regression ---------------------------------------------------------
 

@@ -229,6 +229,61 @@ for (indL in strSets) {
           "LogiRegr TNR: ", valTNR, "\n", sep = "")
       cat("[", myName, "] ",
           "LogiRegr NPV: ", valNPV, "\n", sep = "")
+
+      if (!"hf_preds" %in% colnames(dtPred)
+          || all(is.na(dtPred$hf_preds))) {
+        nG <- NA
+        nS <- NA
+        nTP <- NA
+        nFN <- NA
+        nTN <- NA
+        nFP <- NA
+        valPrec <- NA
+        valReca <- NA
+        valAcc <- NA
+        valTNR <- NA
+        valNPV <- NA
+      } else {
+        nG <- length(which(dtPred$hf_preds == "germline"
+                           & dtPred$subtype == indT
+                           & dtPred$`fastq id` == indS))
+        nS <- length(which(dtPred$hf_preds == "somatic"
+                           & dtPred$subtype == indT
+                           & dtPred$`fastq id` == indS))
+        nTP <- length(which(dtPred$target == 1
+                            & dtPred$hf_preds == "somatic"
+                            & dtPred$subtype == indT
+                            & dtPred$`fastq id` == indS))
+        nFN <- length(which(dtPred$target == 1
+                            & dtPred$hf_preds == "germline"
+                            & dtPred$subtype == indT
+                            & dtPred$`fastq id` == indS))
+        nTN <- length(which(dtPred$target == 0
+                            & dtPred$hf_preds == "germline"
+                            & dtPred$subtype == indT
+                            & dtPred$`fastq id` == indS))
+        nFP <- length(which(dtPred$target == 0
+                            & dtPred$hf_preds == "somatic"
+                            & dtPred$subtype == indT
+                            & dtPred$`fastq id` == indS))
+        valPrec <- nTP / (nTP + nFP)
+        valReca <- nTP / (nTP + nFN)
+        valAcc <- (nTP + nTN) / (nTP + nTN + nFP + nFN)
+        valTNR <- nTN / (nTN + nFP)
+        valNPV <- nTN / (nTN + nFN)
+      }
+      oneRow <- c(oneRow, nG, nS, nTP, nTN, nFP, nFN,
+                  valPrec, valReca, valAcc, valTNR, valNPV)
+      cat("[", myName, "] ",
+          "HardFilt precision: ", valPrec, "\n", sep = "")
+      cat("[", myName, "] ",
+          "HardFilt recall: ", valReca, "\n", sep = "")
+      cat("[", myName, "] ",
+          "HardFilt accuracy: ", valAcc, "\n", sep = "")
+      cat("[", myName, "] ",
+          "HardFilt TNR: ", valTNR, "\n", sep = "")
+      cat("[", myName, "] ",
+          "HardFilt NPV: ", valNPV, "\n", sep = "")
       
       ## append metrics -------------------------------------------------------
       
@@ -286,7 +341,18 @@ colnames(dtScores) <- c(
   "Recall (LogiRegr)",
   "Accuracy (LogiRegr)",
   "TNR (LogiRegr)",
-  "NPV (LogiRegr)")
+  "NPV (LogiRegr)",
+  "Germline (HardFilt)",
+  "Somatic (HardFilt)",
+  "TP (HardFilt)",
+  "TN (HardFilt)",
+  "FP (HardFilt)",
+  "FN (HardFilt)",
+  "Precision (HardFilt)",
+  "Recall (HardFilt)",
+  "Accuracy (HardFilt)",
+  "TNR (HardFilt)",
+  "NPV (HardFilt)")
 dtScores[Data == "metastatic melanoma", Data := "MM"]
 
 fwrite(dtScores, file = file.path(dirData, "scores-sbs.txt"),
