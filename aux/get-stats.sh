@@ -1,8 +1,14 @@
 #!/bin/bash
 
+### A script that generates the input table for "plot-featprog-reps.R". 
+
+## settings -------------------------------------------------------------------
+
 all_dirs="run-70 run-71 run-72 run-73 run-74 run-75 run-76 run-77 run-78 \
 run-79 run-80 run-81 run-82 run-83 run-84 run-85 run-86 run-87 run-88 \
 run-89 run-90 run-91 run-59"
+
+## clmnt ----------------------------------------------------------------------
 
 cd ..
 
