@@ -1,5 +1,8 @@
 ## header ---------------------------------------------------------------------
 
+### A script to calculate correlation between the TMB from a model 
+### and the TMB from the matched pipeline
+
 options(scipen = 999)
 options(stringsAsFactors = F)
 rm(list = ls())
@@ -97,30 +100,30 @@ ks.test(dtMeta[subtype == "BRCA" | subtype == "SARC" |  subtype == "UCEC",
 ## test matched tmb vs model tmb by ethnic group -------------------------------
 
 wilcox.test(dtMeta[race == "BLACK", matched_TMB],
-            dtMeta[race == "BLACK", xgm_TMB])
+            dtMeta[race == "BLACK", xgm_TMB], paied = T)
 wilcox.test(dtMeta[race == "WHITE", matched_TMB],
-            dtMeta[race == "WHITE", xgm_TMB])
+            dtMeta[race == "WHITE", xgm_TMB], paied = T)
 wilcox.test(dtMeta[race == "ASIAN", matched_TMB],
-            dtMeta[race == "ASIAN", xgm_TMB])
+            dtMeta[race == "ASIAN", xgm_TMB], paied = T)
 
 wilcox.test(dtMeta[race == "BLACK", matched_TMB],
-            dtMeta[race == "BLACK", lgbm_TMB])
+            dtMeta[race == "BLACK", lgbm_TMB], paied = T)
 wilcox.test(dtMeta[race == "WHITE", matched_TMB],
-            dtMeta[race == "WHITE", lgbm_TMB])
+            dtMeta[race == "WHITE", lgbm_TMB], paied = T)
 wilcox.test(dtMeta[race == "ASIAN", matched_TMB],
-            dtMeta[race == "ASIAN", lgbm_TMB])
+            dtMeta[race == "ASIAN", lgbm_TMB], paied = T)
 
 wilcox.test(dtMeta[race == "BLACK", matched_TMB],
-            dtMeta[race == "BLACK", tabnet_TMB])
+            dtMeta[race == "BLACK", tabnet_TMB], paied = T)
 wilcox.test(dtMeta[race == "WHITE", matched_TMB],
-            dtMeta[race == "WHITE", tabnet_TMB])
+            dtMeta[race == "WHITE", tabnet_TMB], paied = T)
 wilcox.test(dtMeta[race == "ASIAN", matched_TMB],
-            dtMeta[race == "ASIAN", tabnet_TMB])
+            dtMeta[race == "ASIAN", tabnet_TMB], paied = T)
 
 ### double check the last one
 indA <- which(dtMeta$race == "ASIAN")
 wilcox.test(dtMeta$matched_TMB[indA],
-            dtMeta$tabnet_TMB[indA])
+            dtMeta$tabnet_TMB[indA], paied = T)
 
 ### test across different ethnicities: conceptually wrong
 ### since it does not take into account genetic background effects
