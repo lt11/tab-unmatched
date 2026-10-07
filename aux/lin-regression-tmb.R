@@ -63,23 +63,23 @@ pdf(file = file.path(dirPlots, "mean-vs-reported.pdf"), width = 12, height = 8)
 print(plotTolo)
 dev.off()
 
-### calculate IQR bounds (nostri)
-Q1 <- quantile(dtMeta$mean_TMB_comparison, 0.25, na.rm = T)
-Q3 <- quantile(dtMeta$mean_TMB_comparison, 0.75, na.rm = T)
-valIQR <- Q3 - Q1
-valLow <- Q1 - 1.5 * valIQR
-valUp <- Q3 + 1.5 * valIQR
-nNostri <- length(dtMeta[mean_TMB_comparison >= valLow
-                         & mean_TMB_comparison <= valUp])
-
 ### calculate IQR bounds (loro)
 Q1 <- quantile(dtMeta$TMB_internally_calculated, 0.25, na.rm = T)
 Q3 <- quantile(dtMeta$TMB_internally_calculated, 0.75, na.rm = T)
 valIQR <- Q3 - Q1
 valLow <- Q1 - 1.5 * valIQR
 valUp <- Q3 + 1.5 * valIQR
-nLoro <- length(dtMeta[TMB_internally_calculated >= valLow
-                       & TMB_internally_calculated <= valUp])
+nLoro <- nrow(dtMeta[TMB_internally_calculated >= valLow
+                     & TMB_internally_calculated <= valUp])
+
+### calculate IQR bounds (nostri)
+Q1 <- quantile(dtMeta$mean_TMB_comparison, 0.25, na.rm = T)
+Q3 <- quantile(dtMeta$mean_TMB_comparison, 0.75, na.rm = T)
+valIQR <- Q3 - Q1
+valLow <- Q1 - 1.5 * valIQR
+valUp <- Q3 + 1.5 * valIQR
+nNostri <- nrow(dtMeta[mean_TMB_comparison >= valLow
+                       & mean_TMB_comparison <= valUp])
 
 ### subset the data to remove outliers (nostri)
 dtMetaNoOutl <- dtMeta[mean_TMB_comparison >= valLow
