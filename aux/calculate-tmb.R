@@ -15,9 +15,10 @@ pathTab <- file.path(dirBase, "tab")
 pathOut <- file.path(pathRes, "metadata-tmb.txt")
 
 ### kit sizes
-kitSize <- c(nimblegen_seqcap_ez_v3_kit = 151.7,
-             hgsc_vcrome_kit =  45.1,
-             agilent_custom_v2_kit =  56.8)
+kitSize <- c(nimblegen_seqcap_ez_v3_kit = 35.3,
+             hgsc_vcrome_kit =  30.3,
+             agilent_custom_v2_kit =  40.8,
+             sureselect_human_all_exon_v5_UTRs_hg38 = 30.5)
 
 ### the ANN values to count
 tmbVariants <- c("missense_variant",
@@ -55,7 +56,9 @@ dtCounts <- dtAllCsvFiles[
     matched_somatic = sum(target == 1, na.rm = T),
     xgm_somatic = sum(xgm_preds == "somatic", na.rm = T),
     lgbm_somatic = sum(lgbm_preds == "somatic", na.rm = T),
-    tabnet_somatic = sum(tabnet_preds == "somatic", na.rm = T)
+    tabnet_somatic = sum(tabnet_preds == "somatic", na.rm = T),
+    logreg_somatic = sum(logreg_preds == "somatic", na.rm = T),
+    hf_somatic = sum(hf_preds == "somatic", na.rm = T)
   ),
   by = fastq_id
 ]
@@ -76,7 +79,9 @@ dtMetadataCounts[, `:=`(
   matched_TMB = matched_somatic / kit_size,
   xgm_TMB = xgm_somatic / kit_size,
   lgbm_TMB = lgbm_somatic / kit_size,
-  tabnet_TMB = tabnet_somatic / kit_size
+  tabnet_TMB = tabnet_somatic / kit_size,
+  logreg_TMB = logreg_somatic / kit_size,
+  hf_TMB = hf_somatic / kit_size
 )]
 
 ### add TMB columns to compare with the McLaughlin paper
