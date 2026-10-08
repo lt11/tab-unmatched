@@ -34,7 +34,8 @@ dtMeta[subtype == "metastatic melanoma", subtype := "MM"]
 ### normalised with a fixed value for the size of the target
 ### as in the original paper (41 Mbp)
 dtMeta[, mean_TMB_comparison := rowMeans(.SD, na.rm = TRUE),
-       .SDcols = tail(names(dtMeta), 3)]
+       .SDcols = c("xgm_TMB_comparison", "lgbm_TMB_comparison",
+                   "tabnet_TMB_comparison")]
 
 ## compare matched pipeline vs models by subtype ------------------------------
 
