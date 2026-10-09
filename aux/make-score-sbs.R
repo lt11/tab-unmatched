@@ -12,7 +12,9 @@ library(scriptName)
 ### fixed settings
 dirBase <- dirname(this.dir())
 dirData <- file.path(dirBase, "res")
-strSets <- c("train", "validation", "test-melanoma", "test-mixtcga")
+strSets <- c("train", "validation", 
+             "test-melanoma", "test-mixtcga", "test-ffpe-dlbcl",
+             "test-mixanc")
 dtScores <- data.table()
 
 ## clmnt ----------------------------------------------------------------------
