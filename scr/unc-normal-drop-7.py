@@ -571,6 +571,33 @@ print("post ANN filters somatic variants Nb: " + str(count))
 data.to_csv(output_dir + '/' + mode + '-df-flt.csv', index = False)
 data.head(2)
 
+subtype = 'mixanc'
+mode = 'test-' + subtype
+print("processing: " + mode)
+input_dir = workspace + 'test/' + subtype + '/'
+output_dir = workspace + 'res/'
+
+### load vcf
+raw = load_variants(input_dir)
+data = extract_feature(raw, mode, output_dir)
+data.drop('nb_variants', axis=1, inplace=True)
+### filter common germline variants
+data.drop(data[(data['pop_max'] >= 0.01) &
+               (data['target'] == 0)].index,
+               inplace=True)
+count = (data['target'] == 0).sum()
+print("post pop_max filters germline variants Nb: " + str(count))
+count = (data['target'] == 1).sum()
+print("post pop_max filters somatic variants Nb: " + str(count))
+ind_out = data[(data['target'] == 0) & (~data['ANN'].isin(ann_valid))].index
+data.drop(index=ind_out, inplace=True)
+count = (data['target'] == 0).sum()
+print("post ANN filters germline variants Nb: " + str(count))
+count = (data['target'] == 1).sum()
+print("post ANN filters somatic variants Nb: " + str(count))
+data.to_csv(output_dir + '/' + mode + '-df-flt.csv', index = False)
+data.head(2)
+
 ## predict data preparation ----------------------------------------------------
 
 subtype = 'tnbc'
@@ -636,7 +663,12 @@ test_X_ffpe = test_df_ffpe.drop(columns='target')
 test_Y_ffpe = test_df_ffpe['target']
 test_pred_ffpe = test_df_ffpe.copy()
 
-test_df = pd.read_csv(output_dir + '/test-tnbc-df-flt.csv')
+test_df_anc = pd.read_csv(output_dir + '/test-mixanc-df-flt.csv')
+test_X_anc = test_df_anc.drop(columns='target')
+test_Y_anc = test_df_anc['target']
+test_pred_anc = test_df_anc.copy()
+
+test_df =pd.read_csv(output_dir + '/test-tnbc-df-flt.csv')
 test_X = test_df.drop(columns='target')
 test_pred = test_df.copy()
 
@@ -720,6 +752,12 @@ if run_hf:
     report_prediction_counts('test ffpe-dlbcl', test_Y_ffpe, test_pred_ffpe,
                              'hf_preds')
 
+    ### test mixanc
+    preds_hard_filter = add_hard_filter_predictions(test_pred_anc, test_X_anc)
+    accuracy('hard-filter-test-mixanc', test_Y_anc, preds_hard_filter)
+    report_prediction_counts('test mixanc', test_Y_anc, test_pred_anc,
+                             'hf_preds')
+
     ### test tnbc data
     add_hard_filter_predictions(test_pred, test_X)
     report_prediction_counts('test TNBC', None, test_pred, 'hf_preds')
@@ -730,6 +768,7 @@ else:
     test_pred_m['hf_preds'] = 'NA'
     test_pred_mix['hf_preds'] = 'NA'
     test_pred_ffpe['hf_preds'] = 'NA'
+    test_pred_anc['hf_preds'] = 'NA'
     test_pred['hf_preds'] = 'NA'
 
 ## logistic regression ---------------------------------------------------------
@@ -852,6 +891,27 @@ if run_logit:
           + ', somatic: '
           + str(nb_somatic_pred))
 
+    ### test mixanc
+    preds_logreg = logreg.predict_proba(test_X_anc[logreg_feature_cols])[:, 1]
+    accuracy('logistic-regression-test-mixanc', test_Y_anc, preds_logreg)
+    test_pred_anc['logreg_preds'] = np.where(preds_logreg>0.5,
+                                             'somatic',
+                                             'germline')
+    nb_germline = len(test_Y_anc[test_Y_anc==0])
+    nb_somatic = len(test_Y_anc[test_Y_anc==1])
+    nb_germline_pred = len(test_pred_anc[test_pred_anc['logreg_preds']==
+                                         'germline'])
+    nb_somatic_pred = len(test_pred_anc[test_pred_anc['logreg_preds']==
+                                        'somatic'])
+    print('[test mixanc set] real nb of germline: '
+          + str(nb_germline)
+          + ', somatic: '
+          + str(nb_somatic))
+    print('[test mixanc set] predicted nb of germline: '
+          + str(nb_germline_pred)
+          + ', somatic: '
+          + str(nb_somatic_pred))
+
     ### test tnbc data
     preds_logreg = logreg.predict_proba(test_X[logreg_feature_cols])[:, 1]
     test_pred['logreg_preds'] = np.where(preds_logreg>0.5,
@@ -870,6 +930,7 @@ else:
     test_pred_m['logreg_preds'] = 'NA'
     test_pred_mix['logreg_preds'] = 'NA'
     test_pred_ffpe['logreg_preds'] = 'NA'
+    test_pred_anc['logreg_preds'] = 'NA'
     test_pred['logreg_preds'] = 'NA'
 
 ## xgboost ---------------------------------------------------------------------
@@ -1010,6 +1071,23 @@ print('[test ffpe-dlbcl set] real nb of germline: '
       + ', somatic: '
       + str(nb_somatic))
 print('[test ffpe-dlbcl set] predicted nb of germline: '
+      + str(nb_germline_pred)
+      + ', somatic: '
+      + str(nb_somatic_pred))
+
+### test mixanc
+preds_xgboost = bst.predict_proba(test_X_anc.drop(columns=drop_cols))[:, 1]
+accuracy('xgboost-test-mixanc', test_Y_anc, preds_xgboost)
+test_pred_anc['xgm_preds'] = np.where(preds_xgboost>0.5,'somatic','germline')
+nb_germline = len(test_Y_anc[test_Y_anc==0])
+nb_somatic = len(test_Y_anc[test_Y_anc==1])
+nb_germline_pred = len(test_pred_anc[test_pred_anc['xgm_preds']=='germline'])
+nb_somatic_pred = len(test_pred_anc[test_pred_anc['xgm_preds']=='somatic'])
+print('[test mixanc set] real nb of germline: '
+      + str(nb_germline)
+      + ', somatic: '
+      + str(nb_somatic))
+print('[test mixanc set] predicted nb of germline: '
       + str(nb_germline_pred)
       + ', somatic: '
       + str(nb_somatic_pred))
@@ -1162,6 +1240,24 @@ print('[test ffpe-dlbcl set] predicted nb of germline: '
       + ', somatic: '
       + str(nb_somatic_pred))
 
+### test mixanc
+preds_lgbm = gbm.predict(test_X_anc.drop(columns=drop_cols),
+num_iteration=gbm.best_iteration)
+accuracy('lgbm-test-mixanc', test_Y_anc, preds_lgbm)
+test_pred_anc['lgbm_preds'] = np.where(preds_lgbm>0.5,'somatic','germline')
+nb_germline = len(test_Y_anc[test_Y_anc==0])
+nb_somatic = len(test_Y_anc[test_Y_anc==1])
+nb_germline_pred = len(test_pred_anc[test_pred_anc['lgbm_preds']=='germline'])
+nb_somatic_pred = len(test_pred_anc[test_pred_anc['lgbm_preds']=='somatic'])
+print('[test mixanc set] real nb of germline: '
+      + str(nb_germline)
+      + ', somatic: '
+      + str(nb_somatic))
+print('[test mixanc set] predicted nb of germline: '
+      + str(nb_germline_pred)
+      + ', somatic: '
+      + str(nb_somatic_pred))
+
 ### test tnbc data
 preds_lgbm = gbm.predict(test_X.drop(columns=drop_cols),
 num_iteration=gbm.best_iteration)
@@ -1192,6 +1288,8 @@ X_test_mix = test_X_mix.drop(columns=drop_cols).to_numpy()
 Y_test_mix = test_Y_mix.to_numpy().squeeze()
 X_test_ffpe = test_X_ffpe.drop(columns=drop_cols).to_numpy()
 Y_test_ffpe = test_Y_ffpe.to_numpy().squeeze()
+X_test_anc = test_X_anc.drop(columns=drop_cols).to_numpy()
+Y_test_anc = test_Y_anc.to_numpy().squeeze()
 X_test = test_X.drop(columns=drop_cols).to_numpy()
 
 ### classifier
@@ -1321,6 +1419,23 @@ print('[test ffpe-dlbcl set] predicted nb of germline: '
       + ', somatic: '
       + str(nb_somatic_pred))
 
+### test mixanc
+preds = classifier.predict_proba(X_test_anc)[:, 1]
+accuracy('tabnet-test-mixanc', test_Y_anc, preds)
+test_pred_anc['tabnet_preds'] = np.where(preds>0.5,'somatic','germline')
+nb_germline = len(test_Y_anc[test_Y_anc==0])
+nb_somatic = len(test_Y_anc[test_Y_anc==1])
+nb_germline_pred = len(test_pred_anc[test_pred_anc['tabnet_preds']=='germline'])
+nb_somatic_pred = len(test_pred_anc[test_pred_anc['tabnet_preds']=='somatic'])
+print('[test mixanc set] real nb of germline: '
+      + str(nb_germline)
+      + ', somatic: '
+      + str(nb_somatic))
+print('[test mixanc set] predicted nb of germline: '
+      + str(nb_germline_pred)
+      + ', somatic: '
+      + str(nb_somatic_pred))
+
 ### test tnbc data
 preds =  classifier.predict_proba(X_test)[:, 1]
 test_pred['tabnet_preds'] = np.where(preds>0.5,'somatic','germline')
@@ -1337,4 +1452,5 @@ validation_pred.to_csv(output_dir + '/preds-validation.csv', index = False)
 test_pred_m.to_csv(output_dir + '/preds-test-melanoma.csv', index = False)
 test_pred_mix.to_csv(output_dir + '/preds-test-mixtcga.csv', index = False)
 test_pred_ffpe.to_csv(output_dir + '/preds-test-ffpe-dlbcl.csv', index = False)
+test_pred_anc.to_csv(output_dir + '/preds-test-mixanc.csv', index = False)
 test_pred.to_csv(output_dir + '/preds-test-tnbc.csv', index = False)
