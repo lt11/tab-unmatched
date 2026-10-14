@@ -10,7 +10,14 @@ library(scriptName)
 ## settings -------------------------------------------------------------------
 
 ### fixed settings
-dirBase <- dirname(this.dir())
+### the run folder is the first argument if given, else the folder
+### above this script
+args <- commandArgs(trailingOnly = T)
+if (length(args) >= 1L) {
+  dirBase <- normalizePath(args[1], mustWork = T)
+} else {
+  dirBase <- dirname(this.dir())
+}
 dirData <- file.path(dirBase, "res")
 strSets <- c("train", "validation", 
              "test-melanoma", "test-mixtcga", "test-ffpe-dlbcl",
@@ -39,11 +46,6 @@ for (indL in strSets) {
   }
   
   dtPred <- fread(pathInPred)
-  
-  ## keep only tmb snvs -------------------------------------------------------
-  
-  dtPred <- dtPred[ontology_missense == 1 
-                   | ontology_nonsense == 1]
   
   oneRow <- c(indL)
   nGermline <- length(which(dtPred$target == 0))
@@ -134,7 +136,6 @@ for (indL in strSets) {
       "TabNet TNR: ", valTNR, "\n", sep = "")
   cat("[", myName, "] ",
       "TabNet NPV: ", valNPV, "\n", sep = "")
-
   if (!"logreg_preds" %in% colnames(dtPred)
       || all(is.na(dtPred$logreg_preds))) {
     nG <- NA
@@ -287,5 +288,5 @@ colnames(dtScores) <- c(
   "TNR (HardFilt)",
   "NPV (HardFilt)")
 
-fwrite(dtScores, file = file.path(dirData, "scores-snv.txt"),
+fwrite(dtScores, file = file.path(dirData, "scores.txt"),
        append = F, sep = "\t", col.names = T)

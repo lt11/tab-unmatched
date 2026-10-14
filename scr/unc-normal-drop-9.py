@@ -2,37 +2,32 @@ from __future__ import division
 
 ## settings ------------------------------------------------------------------
 
-### 'none' or any valid feature e.g. 'CNT', 'ontology_1', 'DP'
-### (of type list)
-optional_drop_features = ['none']
-### important features
-# optional_drop_features = ['CNT']
-# optional_drop_features = ['CNT',
-#                           'ontology_NR',
-#                           'DP',
-#                           'ontology_inframe_indel', 
-#                           'AF',
-#                           'ontology_frame_shift_indel',
-#                           'AD',
-#                           'pop_max',
-#                           'subs_type_NA',
-#                           'ontology_nonsense',
-#                           'subs_type_G>A',
-#                           'trinucleotide_TCA',
-#                           'trinucleotide_GGG',
-#                           'subs_type_G>T',
-#                           'subs_type_C>T',
-#                           'ontology_missense',
-#                           'subs_type_G>C',
-#                           'trinucleotide_TCC',
-#                           'trinucleotide_GGA',
-#                           'trinucleotide_TGA',
-#                           'trinucleotide_GTG',  
-#                           'subs_type_C>A']
-### useless features
-# optional_drop_features = ['trinucleotide_GAC']
-# optional_drop_features = ['trinucleotide_GAC', 'trinucleotide_ACA',
-#                           'trinucleotide_GCC', 'subs_type_A>T']
+### optional_drop_features is read from the command line (--drop-features):
+### 'none' or any feature in valid_drop_features
+### the paths and the stage are read from the command line as well; with none
+### of them given, everything sits next to the working directory as in drop-8
+valid_drop_features = ['CNT',
+                       'ontology_NR',
+                       'DP',
+                       'ontology_inframe_indel',
+                       'AF',
+                       'ontology_frame_shift_indel',
+                       'AD',
+                       'pop_max',
+                       'subs_type_NA',
+                       'ontology_nonsense',
+                       'subs_type_G>A',
+                       'trinucleotide_TCA',
+                       'trinucleotide_GGG',
+                       'subs_type_G>T',
+                       'subs_type_C>T',
+                       'ontology_missense',
+                       'subs_type_G>C',
+                       'trinucleotide_TCC',
+                       'trinucleotide_GGA',
+                       'trinucleotide_TGA',
+                       'trinucleotide_GTG',
+                       'subs_type_C>A']
 
 ## common methods -------------------------------------------------------------
 
@@ -375,28 +370,119 @@ def extract_feature(raw, mode, output_dir):
 
 ## common data -----------------------------------------------------------------
 
+import argparse
 import pandas as pd
-import sys, csv, os, re
+import csv, os, re, sys
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-if len(sys.argv) < 2:
-    raise SystemExit("Usage: python unc-normal-drop-5.py <seed>")
-seed = int(sys.argv[1])
-print("Using seed: " + str(seed))
+### argument parsing
+def parse_bool(value):
+    value = value.lower()
+    if value in ('true', 't', '1', 'yes', 'y'):
+        return True
+    if value in ('false', 'f', '0', 'no', 'n'):
+        return False
+    raise argparse.ArgumentTypeError("Expected true/false, 1/0, or yes/no")
 
+parser = argparse.ArgumentParser()
+parser.add_argument("seed", type=int)
+parser.add_argument("run_logit", nargs="?", type=parse_bool, default=False)
+parser.add_argument("run_hf", nargs="?", type=parse_bool, default=False)
+parser.add_argument("--drop-features", nargs="+", default=['none'],
+                    help="'none' or one or more of: "
+                         + ", ".join(valid_drop_features))
+parser.add_argument("--stage", choices=['all', 'prep', 'train'],
+                    default='all',
+                    help="all: features and models (default); prep: the "
+                         "feature tables only, written to --dir-feat; "
+                         "train: the models only, from the feature tables "
+                         "in --dir-feat (the seed is ignored with prep)")
+parser.add_argument("--dir-vcf",
+                    help="folder holding train/, validation/ and "
+                         "test/<subtype>/ (default: the parent of the "
+                         "working directory)")
+parser.add_argument("--file-meta",
+                    help="metadata table (default: tab/metadata.csv in the "
+                         "parent of the working directory)")
+parser.add_argument("--dir-out",
+                    help="results folder (default: res/ in the parent of "
+                         "the working directory)")
+parser.add_argument("--dir-feat",
+                    help="folder of the feature tables (default: --dir-out)")
+parser.add_argument("--dry-run", action="store_true",
+                    help="check the arguments, print the settings and exit")
+args = parser.parse_args()
+
+seed = args.seed
+print("Using seed: " + str(seed))
+run_logit = args.run_logit
+print("Using run_logit: " + str(run_logit))
+run_hf = args.run_hf
+print("Using run_hf: " + str(run_hf))
+
+### check optional drop features against the internal list; an unknown name
+### is fatal, since ignoring it would silently train on the wrong features
+optional_drop_features = []
+unknown_drop_features = []
+for feat in args.drop_features:
+    if feat == 'none':
+        continue
+    if feat not in valid_drop_features:
+        unknown_drop_features.append(feat)
+    elif feat not in optional_drop_features:
+        optional_drop_features.append(feat)
+if len(unknown_drop_features) > 0:
+    parser.error('not in the internal list of features '
+                 '(valid_drop_features): ' + ', '.join(unknown_drop_features))
+if len(optional_drop_features) == 0:
+    optional_drop_features = ['none']
+print("Using optional_drop_features: " + str(optional_drop_features))
+
+### folder structure; every folder ends with '/', since some file names
+### below are appended without one
 current_directory = os.getcwd()
 workspace = os.path.dirname(current_directory) + '/'
+dir_vcf = os.path.join(args.dir_vcf or workspace, '')
+file_meta = args.file_meta or workspace + 'tab/metadata.csv'
+dir_out = os.path.join(args.dir_out or workspace + 'res', '')
+dir_feat = os.path.join(args.dir_feat or dir_out, '')
+print("Using stage: " + args.stage)
+if args.stage != 'train':
+    print("Using dir_vcf: " + dir_vcf)
+    print("Using file_meta: " + file_meta)
+print("Using dir_feat: " + dir_feat)
+if args.stage != 'prep':
+    print("Using dir_out: " + dir_out)
+if args.dry_run:
+    sys.exit(0)
 
-output_dir = workspace + 'res/'
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
+### the sets in processing order: train comes first, since it fits the
+### one-hot encoder that the other sets reuse
+all_sets = [('train', 'train'),
+            ('validation', 'validation'),
+            ('test-melanoma', 'test/melanoma'),
+            ('test-mixtcga', 'test/mixtcga'),
+            ('test-ffpe-dlbcl', 'test/ffpe-dlbcl'),
+            ('test-mixanc', 'test/mixanc')]
+
+### every input of the stage must be there before any work starts
+if args.stage == 'train':
+    missing = [dir_feat + mode + '-df-flt.csv' for mode, sub_dir in all_sets
+               if not os.path.isfile(dir_feat + mode + '-df-flt.csv')]
+else:
+    missing = [dir_vcf + sub_dir for mode, sub_dir in all_sets
+               if not os.path.isdir(dir_vcf + sub_dir)]
+    if not os.path.isfile(file_meta):
+        missing.append(file_meta)
+if len(missing) > 0:
+    sys.exit('Error: not found: ' + ', '.join(missing))
 
 ### load info
-info_dir = workspace + 'tab/metadata.csv'
-info = pd.read_csv(info_dir, sep=",", quotechar='"', engine='python')
-info.head(2)
+if args.stage != 'train':
+    info = pd.read_csv(file_meta, sep=",", quotechar='"', engine='python')
+    info.head(2)
 
 ### filtering conditions
 ann_valid = {"stop_lost",
@@ -415,180 +501,80 @@ ann_valid = {"stop_lost",
              "frameshift_variant&stop_lost&splice_region_variant",
              "frameshift_variant"}
 
-## training data preparation ---------------------------------------------------
+## feature preparation ---------------------------------------------------------
 
-mode = 'train'
-print("processing: " + mode)
-input_dir = workspace + mode + '/'
+### the feature tables depend on neither the seed nor the dropped features:
+### --stage prep builds them once in dir_feat and --stage train reuses them
+if args.stage != 'train':
+    if not os.path.exists(dir_feat):
+        os.makedirs(dir_feat)
+    for mode, sub_dir in all_sets:
+        print("processing: " + mode)
+        input_dir = dir_vcf + sub_dir + '/'
 
-### load vcf
-raw = load_variants(input_dir)
-data = extract_feature(raw, mode, output_dir)
-data.drop('nb_variants', axis=1, inplace=True)
-### filter common germline variants
-data.drop(data[(data['pop_max'] >= 0.01) &
-               (data['target'] == 0)].index,
-               inplace=True)
-count = (data['target'] == 0).sum()
-print("post pop_max filters germline variants Nb: " + str(count))
-count = (data['target'] == 1).sum()
-print("post pop_max filters somatic variants Nb: " + str(count))
-ind_out = data[(data['target'] == 0) & (~data['ANN'].isin(ann_valid))].index
-data.drop(index=ind_out, inplace=True)
-count = (data['target'] == 0).sum()
-print("post ANN filters germline variants Nb: " + str(count))
-count = (data['target'] == 1).sum()
-print("post ANN filters somatic variants Nb: " + str(count))
-data.to_csv(output_dir + '/' + mode + '-df-flt.csv', index = False)
-data.head(2)
+        ### load vcf
+        raw = load_variants(input_dir)
+        data = extract_feature(raw, mode, dir_feat)
+        data.drop('nb_variants', axis=1, inplace=True)
+        ### filter common germline variants
+        data.drop(data[(data['pop_max'] >= 0.01) &
+                       (data['target'] == 0)].index,
+                       inplace=True)
+        count = (data['target'] == 0).sum()
+        print("post pop_max filters germline variants Nb: " + str(count))
+        count = (data['target'] == 1).sum()
+        print("post pop_max filters somatic variants Nb: " + str(count))
+        ind_out = data[(data['target'] == 0) &
+                       (~data['ANN'].isin(ann_valid))].index
+        data.drop(index=ind_out, inplace=True)
+        count = (data['target'] == 0).sum()
+        print("post ANN filters germline variants Nb: " + str(count))
+        count = (data['target'] == 1).sum()
+        print("post ANN filters somatic variants Nb: " + str(count))
+        data.to_csv(dir_feat + '/' + mode + '-df-flt.csv', index = False)
 
-## validation data preparation -------------------------------------------------
-
-mode = 'validation'
-print("processing: " + mode)
-input_dir = workspace + mode + '/'
-output_dir = workspace + 'res/'
-
-### load vcf
-raw = load_variants(input_dir)
-data = extract_feature(raw, mode, output_dir)
-data.drop('nb_variants', axis=1, inplace=True)
-### filter common germline variants
-data.drop(data[(data['pop_max'] >= 0.01) &
-               (data['target'] == 0)].index,
-               inplace=True)
-count = (data['target'] == 0).sum()
-print("post pop_max filters germline variants Nb: " + str(count))
-count = (data['target'] == 1).sum()
-print("post pop_max filters somatic variants Nb: " + str(count))
-ind_out = data[(data['target'] == 0) & (~data['ANN'].isin(ann_valid))].index
-data.drop(index=ind_out, inplace=True)
-count = (data['target'] == 0).sum()
-print("post ANN filters germline variants Nb: " + str(count))
-count = (data['target'] == 1).sum()
-print("post ANN filters somatic variants Nb: " + str(count))
-data.to_csv(output_dir + '/' + mode + '-df-flt.csv', index = False)
-data.head(2)
-
-## test data preparation -------------------------------------------------------
-
-subtype = 'melanoma'
-mode = 'test-' + subtype
-print("processing: " + mode)
-input_dir = workspace + 'test/' + subtype + '/'
-output_dir = workspace + 'res/'
-
-### load vcf
-raw = load_variants(input_dir)
-data = extract_feature(raw, mode, output_dir)
-data.drop('nb_variants', axis=1, inplace=True)
-### filter common germline variants
-data.drop(data[(data['pop_max'] >= 0.01) &
-               (data['target'] == 0)].index,
-               inplace=True)
-count = (data['target'] == 0).sum()
-print("post pop_max filters germline variants Nb: " + str(count))
-count = (data['target'] == 1).sum()
-print("post pop_max filters somatic variants Nb: " + str(count))
-ind_out = data[(data['target'] == 0) & (~data['ANN'].isin(ann_valid))].index
-data.drop(index=ind_out, inplace=True)
-count = (data['target'] == 0).sum()
-print("post ANN filters germline variants Nb: " + str(count))
-count = (data['target'] == 1).sum()
-print("post ANN filters somatic variants Nb: " + str(count))
-data.to_csv(output_dir + '/' + mode + '-df-flt.csv', index = False)
-data.head(2)
-
-subtype = 'mixtcga'
-mode = 'test-' + subtype
-print("processing: " + mode)
-input_dir = workspace + 'test/' + subtype + '/'
-output_dir = workspace + 'res/'
-
-### load vcf
-raw = load_variants(input_dir)
-data = extract_feature(raw, mode, output_dir)
-data.drop('nb_variants', axis=1, inplace=True)
-### filter common germline variants
-data.drop(data[(data['pop_max'] >= 0.01) &
-               (data['target'] == 0)].index,
-               inplace=True)
-count = (data['target'] == 0).sum()
-print("post pop_max filters germline variants Nb: " + str(count))
-count = (data['target'] == 1).sum()
-print("post pop_max filters somatic variants Nb: " + str(count))
-ind_out = data[(data['target'] == 0) & (~data['ANN'].isin(ann_valid))].index
-data.drop(index=ind_out, inplace=True)
-count = (data['target'] == 0).sum()
-print("post ANN filters germline variants Nb: " + str(count))
-count = (data['target'] == 1).sum()
-print("post ANN filters somatic variants Nb: " + str(count))
-data.to_csv(output_dir + '/' + mode + '-df-flt.csv', index = False)
-data.head(2)
-
-## predict data preparation ----------------------------------------------------
-
-subtype = 'tnbc'
-mode = 'test-' + subtype
-print("processing: " + mode)
-input_dir = workspace + 'test/' + subtype + '/'
-output_dir = workspace + 'res/'
-
-### load vcf
-raw = load_variants(input_dir)
-data = extract_feature(raw, mode, output_dir)
-data.drop('nb_variants', axis=1, inplace=True)
-### filter common germline variants
-data.drop(data[(data['pop_max'] >= 0.01) &
-               (data['target'] == 0)].index,
-               inplace=True)
-count = (data['target'] == 0).sum()
-print("post pop_max filters germline variants Nb: " + str(count))
-count = (data['target'] == 1).sum()
-print("post pop_max filters somatic variants Nb: " + str(count))
-ind_out = data[(data['target'] == 0) & (~data['ANN'].isin(ann_valid))].index
-data.drop(index=ind_out, inplace=True)
-count = (data['target'] == 0).sum()
-print("post ANN filters germline variants Nb: " + str(count))
-count = (data['target'] == 1).sum()
-print("post ANN filters somatic variants Nb: " + str(count))
-data.to_csv(output_dir + '/' + mode + '-df-flt.csv', index = False)
-data.head(2)
+if args.stage == 'prep':
+    print("Feature tables written to " + dir_feat)
+    sys.exit(0)
 
 ## load formatted data ---------------------------------------------------------
 
 import pandas as pd
 
-current_directory = os.getcwd()
-workspace = os.path.dirname(current_directory) + '/'
-
-output_dir = workspace + 'res/'
+### the feature tables are read from dir_feat, every result goes to dir_out
+output_dir = dir_out
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
-train_df = pd.read_csv(output_dir + '/train-df-flt.csv')
+train_df = pd.read_csv(dir_feat + '/train-df-flt.csv')
 train_X = train_df.drop(columns='target')
 train_Y = train_df['target']
 train_pred = train_df.copy()
 
-validation_df = pd.read_csv(output_dir + '/validation-df-flt.csv')
+validation_df = pd.read_csv(dir_feat + '/validation-df-flt.csv')
 validation_X = validation_df.drop(columns='target')
 validation_Y = validation_df['target']
 validation_pred = validation_df.copy()
 
-test_df_m = pd.read_csv(output_dir + '/test-melanoma-df-flt.csv')
+test_df_m = pd.read_csv(dir_feat + '/test-melanoma-df-flt.csv')
 test_X_m = test_df_m.drop(columns='target')
 test_Y_m = test_df_m['target']
 test_pred_m = test_df_m.copy()
 
-test_df_mix = pd.read_csv(output_dir + '/test-mixtcga-df-flt.csv')
+test_df_mix = pd.read_csv(dir_feat + '/test-mixtcga-df-flt.csv')
 test_X_mix = test_df_mix.drop(columns='target')
 test_Y_mix = test_df_mix['target']
 test_pred_mix = test_df_mix.copy()
 
-test_df = pd.read_csv(output_dir + '/test-tnbc-df-flt.csv')
-test_X = test_df.drop(columns='target')
-test_pred = test_df.copy()
+test_df_ffpe = pd.read_csv(dir_feat + '/test-ffpe-dlbcl-df-flt.csv')
+test_X_ffpe = test_df_ffpe.drop(columns='target')
+test_Y_ffpe = test_df_ffpe['target']
+test_pred_ffpe = test_df_ffpe.copy()
+
+test_df_anc = pd.read_csv(dir_feat + '/test-mixanc-df-flt.csv')
+test_X_anc = test_df_anc.drop(columns='target')
+test_Y_anc = test_df_anc['target']
+test_pred_anc = test_df_anc.copy()
 
 base_drop_cols = ['subtype', 'fastq id', 'ANN', '#CHROM', 'POS']
 if optional_drop_features == ['none']:
@@ -596,9 +582,250 @@ if optional_drop_features == ['none']:
 else:
     drop_cols = base_drop_cols + optional_drop_features
 
+### an optional feature that is not a column would be skipped below without
+### a word, leaving the model with one feature more than asked for
+absent_drop_features = [c for c in optional_drop_features
+                        if c != 'none' and c not in train_X.columns]
+if len(absent_drop_features) > 0:
+    sys.exit('Error: --drop-features not among the training columns: '
+             + ', '.join(absent_drop_features))
+
 ### keep only columns that exist in the current DataFrame
 drop_cols = [c for c in drop_cols if c in train_X.columns]
 print("Dropping columns:", drop_cols)
+
+## hard-filter naive classifier ------------------------------------------------
+
+val_cnt = 1
+val_pop_max = 0.001
+
+def predict_hard_filter(features):
+    return np.where((features['CNT'] > val_cnt) &
+                    (features['pop_max'] < val_pop_max),
+                    1,
+                    0)
+
+def add_hard_filter_predictions(pred_df, features):
+    preds = predict_hard_filter(features)
+    pred_df['hf_preds'] = np.where(preds == 1,
+                                   'somatic',
+                                   'germline')
+    return preds
+
+def report_prediction_counts(set_name, labels, pred_df, pred_col):
+    if labels is not None:
+        nb_germline = len(labels[labels==0])
+        nb_somatic = len(labels[labels==1])
+        print('[' + set_name + ' set] real nb of germline: '
+              + str(nb_germline)
+              + ', somatic: '
+              + str(nb_somatic))
+
+    nb_germline_pred = len(pred_df[pred_df[pred_col]=='germline'])
+    nb_somatic_pred = len(pred_df[pred_df[pred_col]=='somatic'])
+    print('[' + set_name + ' set] predicted nb of germline: '
+          + str(nb_germline_pred)
+          + ', somatic: '
+          + str(nb_somatic_pred))
+
+if run_hf:
+    print("Hard-filter classifier: somatic if CNT > "
+          + str(val_cnt)
+          + " and pop_max < "
+          + str(val_pop_max))
+
+    ### train
+    preds_hard_filter = add_hard_filter_predictions(train_pred, train_X)
+    accuracy('hard-filter-train', train_Y, preds_hard_filter)
+    report_prediction_counts('training', train_Y, train_pred, 'hf_preds')
+
+    ### validate
+    preds_hard_filter = add_hard_filter_predictions(validation_pred,
+                                                    validation_X)
+    accuracy('hard-filter-validation', validation_Y, preds_hard_filter)
+    report_prediction_counts('validation', validation_Y, validation_pred,
+                             'hf_preds')
+
+    ### test melanoma
+    preds_hard_filter = add_hard_filter_predictions(test_pred_m, test_X_m)
+    accuracy('hard-filter-test-melanoma', test_Y_m, preds_hard_filter)
+    report_prediction_counts('test melanoma', test_Y_m, test_pred_m,
+                             'hf_preds')
+
+    ### test mixtcga
+    preds_hard_filter = add_hard_filter_predictions(test_pred_mix, test_X_mix)
+    accuracy('hard-filter-test-mixtcga', test_Y_mix, preds_hard_filter)
+    report_prediction_counts('test mixtcga', test_Y_mix, test_pred_mix,
+                             'hf_preds')
+
+    ### test ffpe-dlbcl
+    preds_hard_filter = add_hard_filter_predictions(test_pred_ffpe, test_X_ffpe)
+    accuracy('hard-filter-test-ffpe-dlbcl', test_Y_ffpe, preds_hard_filter)
+    report_prediction_counts('test ffpe-dlbcl', test_Y_ffpe, test_pred_ffpe,
+                             'hf_preds')
+
+    ### test mixanc
+    preds_hard_filter = add_hard_filter_predictions(test_pred_anc, test_X_anc)
+    accuracy('hard-filter-test-mixanc', test_Y_anc, preds_hard_filter)
+    report_prediction_counts('test mixanc', test_Y_anc, test_pred_anc,
+                             'hf_preds')
+else:
+    print("Skipping hard-filter classifier because run_hf is False")
+    train_pred['hf_preds'] = 'NA'
+    validation_pred['hf_preds'] = 'NA'
+    test_pred_m['hf_preds'] = 'NA'
+    test_pred_mix['hf_preds'] = 'NA'
+    test_pred_ffpe['hf_preds'] = 'NA'
+    test_pred_anc['hf_preds'] = 'NA'
+
+## logistic regression ---------------------------------------------------------
+
+if run_logit:
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    logreg_feature_cols = ['CNT', 'pop_max']
+    print("Logistic regression columns:", logreg_feature_cols)
+
+    logreg = make_pipeline(
+        StandardScaler(),
+        LogisticRegression(max_iter=5000, random_state=seed)
+    )
+
+    ### fit model
+    logreg.fit(train_X[logreg_feature_cols], train_Y)
+    joblib.dump(logreg, output_dir + '/model-logistic-regression.pkl')
+
+    ### train
+    preds_logreg = logreg.predict_proba(train_X[logreg_feature_cols])[:, 1]
+    accuracy('logistic-regression-train', train_Y, preds_logreg)
+    train_pred['logreg_preds'] = np.where(preds_logreg>0.5,
+                                          'somatic',
+                                          'germline')
+    nb_germline = len(train_Y[train_Y==0])
+    nb_somatic = len(train_Y[train_Y==1])
+    nb_germline_pred = len(train_pred[train_pred['logreg_preds']=='germline'])
+    nb_somatic_pred = len(train_pred[train_pred['logreg_preds']=='somatic'])
+    print('[training set] real nb of germline: ' 
+          + str(nb_germline) 
+          + ', somatic: '
+          + str(nb_somatic))
+    print('[training set] predicted nb of germline: ' 
+          + str(nb_germline_pred) 
+          + ', somatic: ' 
+          + str(nb_somatic_pred))
+
+    ### validate
+    preds_logreg = logreg.predict_proba(validation_X[logreg_feature_cols])[:, 1]
+    accuracy('logistic-regression-validation', validation_Y, preds_logreg)
+    validation_pred['logreg_preds'] = np.where(preds_logreg>0.5,
+                                               'somatic',
+                                               'germline')
+    nb_germline = len(validation_Y[validation_Y==0])
+    nb_somatic = len(validation_Y[validation_Y==1])
+    nb_germline_pred = len(validation_pred[validation_pred['logreg_preds']==
+                                           'germline'])
+    nb_somatic_pred = len(validation_pred[validation_pred['logreg_preds']==
+                                          'somatic'])
+    print('[validation set] real nb of germline: ' 
+          + str(nb_germline) 
+          + ', somatic: ' 
+          + str(nb_somatic))
+    print('[validation set] predicted nb of germline: ' 
+          + str(nb_germline_pred) 
+          + ', somatic: ' 
+          + str(nb_somatic_pred))
+
+    ### test melanoma
+    preds_logreg = logreg.predict_proba(test_X_m[logreg_feature_cols])[:, 1]
+    accuracy('logistic-regression-test-melanoma', test_Y_m, preds_logreg)
+    test_pred_m['logreg_preds'] = np.where(preds_logreg>0.5,
+                                           'somatic',
+                                           'germline')
+    nb_germline = len(test_Y_m[test_Y_m==0])
+    nb_somatic = len(test_Y_m[test_Y_m==1])
+    nb_germline_pred = len(test_pred_m[test_pred_m['logreg_preds']=='germline'])
+    nb_somatic_pred = len(test_pred_m[test_pred_m['logreg_preds']=='somatic'])
+    print('[test melanoma set] real nb of germline: ' 
+          + str(nb_germline) 
+          + ', somatic: ' 
+          + str(nb_somatic))
+    print('[test melanoma set] predicted nb of germline: ' 
+          + str(nb_germline_pred) 
+          + ', somatic: ' 
+          + str(nb_somatic_pred))
+
+    ### test mixtcga
+    preds_logreg = logreg.predict_proba(test_X_mix[logreg_feature_cols])[:, 1]
+    accuracy('logistic-regression-test-mixtcga', test_Y_mix, preds_logreg)
+    test_pred_mix['logreg_preds'] = np.where(preds_logreg>0.5,
+                                             'somatic',
+                                             'germline')
+    nb_germline = len(test_Y_mix[test_Y_mix==0])
+    nb_somatic = len(test_Y_mix[test_Y_mix==1])
+    nb_germline_pred = len(test_pred_mix[test_pred_mix['logreg_preds']==
+                                           'germline'])
+    nb_somatic_pred = len(test_pred_mix[test_pred_mix['logreg_preds']==
+                                          'somatic'])
+    print('[test mixtcga set] real nb of germline: ' 
+          + str(nb_germline) 
+          + ', somatic: ' 
+          + str(nb_somatic))
+    print('[test mixtcga set] predicted nb of germline: '
+          + str(nb_germline_pred)
+          + ', somatic: '
+          + str(nb_somatic_pred))
+
+    ### test ffpe-dlbcl
+    preds_logreg = logreg.predict_proba(test_X_ffpe[logreg_feature_cols])[:, 1]
+    accuracy('logistic-regression-test-ffpe-dlbcl', test_Y_ffpe, preds_logreg)
+    test_pred_ffpe['logreg_preds'] = np.where(preds_logreg>0.5,
+                                              'somatic',
+                                              'germline')
+    nb_germline = len(test_Y_ffpe[test_Y_ffpe==0])
+    nb_somatic = len(test_Y_ffpe[test_Y_ffpe==1])
+    nb_germline_pred = len(test_pred_ffpe[test_pred_ffpe['logreg_preds']==
+                                           'germline'])
+    nb_somatic_pred = len(test_pred_ffpe[test_pred_ffpe['logreg_preds']==
+                                          'somatic'])
+    print('[test ffpe-dlbcl set] real nb of germline: '
+          + str(nb_germline)
+          + ', somatic: '
+          + str(nb_somatic))
+    print('[test ffpe-dlbcl set] predicted nb of germline: '
+          + str(nb_germline_pred)
+          + ', somatic: '
+          + str(nb_somatic_pred))
+
+    ### test mixanc
+    preds_logreg = logreg.predict_proba(test_X_anc[logreg_feature_cols])[:, 1]
+    accuracy('logistic-regression-test-mixanc', test_Y_anc, preds_logreg)
+    test_pred_anc['logreg_preds'] = np.where(preds_logreg>0.5,
+                                             'somatic',
+                                             'germline')
+    nb_germline = len(test_Y_anc[test_Y_anc==0])
+    nb_somatic = len(test_Y_anc[test_Y_anc==1])
+    nb_germline_pred = len(test_pred_anc[test_pred_anc['logreg_preds']==
+                                         'germline'])
+    nb_somatic_pred = len(test_pred_anc[test_pred_anc['logreg_preds']==
+                                        'somatic'])
+    print('[test mixanc set] real nb of germline: '
+          + str(nb_germline)
+          + ', somatic: '
+          + str(nb_somatic))
+    print('[test mixanc set] predicted nb of germline: '
+          + str(nb_germline_pred)
+          + ', somatic: '
+          + str(nb_somatic_pred))
+else:
+    print("Skipping logistic regression because run_logit is False")
+    train_pred['logreg_preds'] = 'NA'
+    validation_pred['logreg_preds'] = 'NA'
+    test_pred_m['logreg_preds'] = 'NA'
+    test_pred_mix['logreg_preds'] = 'NA'
+    test_pred_ffpe['logreg_preds'] = 'NA'
+    test_pred_anc['logreg_preds'] = 'NA'
 
 ## xgboost ---------------------------------------------------------------------
 
@@ -609,15 +836,17 @@ from xgboost import XGBClassifier
 from xgboost import plot_importance
 
 ### create model instance
-bst = XGBClassifier(learning_rate=0.05, n_estimators=750, max_depth=30, 
-                    eval_set=[(validation_X, validation_Y)],
+bst = XGBClassifier(learning_rate=0.05, n_estimators=750, max_depth=30,
+                    subsample=0.8, colsample_bytree=0.9,
                     objective='binary:logistic',
                     random_state=seed)
                     ### avoid overfit, if 10 round no improve, stop
                     ### early_stopping_rounds=10
 
 ### fit model
-bst.fit(train_X.drop(columns=drop_cols), train_Y)
+bst.fit(train_X.drop(columns=drop_cols), train_Y,
+        eval_set=[(validation_X.drop(columns=drop_cols), validation_Y)],
+        verbose=False)
 bst.save_model(output_dir + 'model-xgboost.json')
 
 ### get feature importance
@@ -718,20 +947,44 @@ print('[test mixtcga set] real nb of germline: '
       + str(nb_germline) 
       + ', somatic: ' 
       + str(nb_somatic))
-print('[test mixtcga set] predicted nb of germline: ' 
-      + str(nb_germline_pred) 
-      + ', somatic: ' 
+print('[test mixtcga set] predicted nb of germline: '
+      + str(nb_germline_pred)
+      + ', somatic: '
       + str(nb_somatic_pred))
 
-### test tnbc data
-preds_xgboost = bst.predict_proba(test_X.drop(columns=drop_cols))[:, 1]
-test_pred['xgm_preds'] = np.where(preds_xgboost>0.5,'somatic','germline')
-nb_germline = len(test_pred[test_pred['xgm_preds']=='germline'])
-nb_somatic = len(test_pred[test_pred['xgm_preds']=='somatic'])
-print('[test TNBC set] predicted nb of germline: ' 
-      + str(nb_germline) 
-      + ', somatic: ' 
+### test ffpe-dlbcl
+preds_xgboost = bst.predict_proba(test_X_ffpe.drop(columns=drop_cols))[:, 1]
+accuracy('xgboost-test-ffpe-dlbcl', test_Y_ffpe, preds_xgboost)
+test_pred_ffpe['xgm_preds'] = np.where(preds_xgboost>0.5,'somatic','germline')
+nb_germline = len(test_Y_ffpe[test_Y_ffpe==0])
+nb_somatic = len(test_Y_ffpe[test_Y_ffpe==1])
+nb_germline_pred = len(test_pred_ffpe[test_pred_ffpe['xgm_preds']=='germline'])
+nb_somatic_pred = len(test_pred_ffpe[test_pred_ffpe['xgm_preds']=='somatic'])
+print('[test ffpe-dlbcl set] real nb of germline: '
+      + str(nb_germline)
+      + ', somatic: '
       + str(nb_somatic))
+print('[test ffpe-dlbcl set] predicted nb of germline: '
+      + str(nb_germline_pred)
+      + ', somatic: '
+      + str(nb_somatic_pred))
+
+### test mixanc
+preds_xgboost = bst.predict_proba(test_X_anc.drop(columns=drop_cols))[:, 1]
+accuracy('xgboost-test-mixanc', test_Y_anc, preds_xgboost)
+test_pred_anc['xgm_preds'] = np.where(preds_xgboost>0.5,'somatic','germline')
+nb_germline = len(test_Y_anc[test_Y_anc==0])
+nb_somatic = len(test_Y_anc[test_Y_anc==1])
+nb_germline_pred = len(test_pred_anc[test_pred_anc['xgm_preds']=='germline'])
+nb_somatic_pred = len(test_pred_anc[test_pred_anc['xgm_preds']=='somatic'])
+print('[test mixanc set] real nb of germline: '
+      + str(nb_germline)
+      + ', somatic: '
+      + str(nb_somatic))
+print('[test mixanc set] predicted nb of germline: '
+      + str(nb_germline_pred)
+      + ', somatic: '
+      + str(nb_somatic_pred))
 
 ## lightgbm --------------------------------------------------------------------
 
@@ -742,6 +995,7 @@ import seaborn as sns
 
 params = {'objective': 'binary','metric': 'auc', 'boosting_type': 'gbdt',
           'num_leaves': 31, 'learning_rate': 0.05, 'feature_fraction': 0.9,
+          'bagging_fraction': 0.8, 'bagging_freq': 1,
           'seed': seed, 'feature_fraction_seed': seed,
           'bagging_seed': seed, 'data_random_seed': seed}
 ### fit model
@@ -847,21 +1101,46 @@ print('[test mixtcga set] real nb of germline: '
       + str(nb_germline) 
       + ', somatic: ' 
       + str(nb_somatic))
-print('[test mixtcga set] predicted nb of germline: ' 
-      + str(nb_germline_pred) 
-      + ', somatic: ' 
+print('[test mixtcga set] predicted nb of germline: '
+      + str(nb_germline_pred)
+      + ', somatic: '
       + str(nb_somatic_pred))
 
-### test tnbc data
-preds_lgbm = gbm.predict(test_X.drop(columns=drop_cols),
+### test ffpe-dlbcl
+preds_lgbm = gbm.predict(test_X_ffpe.drop(columns=drop_cols),
 num_iteration=gbm.best_iteration)
-test_pred['lgbm_preds'] = np.where(preds_lgbm>0.5,'somatic','germline')
-nb_germline = len(test_pred[test_pred['lgbm_preds']=='germline'])
-nb_somatic = len(test_pred[test_pred['lgbm_preds']=='somatic'])
-print('[test TNBC set] predicted nb of germline: ' 
-      + str(nb_germline) 
-      + ', somatic: ' 
+accuracy('lgbm-test-ffpe-dlbcl', test_Y_ffpe, preds_lgbm)
+test_pred_ffpe['lgbm_preds'] = np.where(preds_lgbm>0.5,'somatic','germline')
+nb_germline = len(test_Y_ffpe[test_Y_ffpe==0])
+nb_somatic = len(test_Y_ffpe[test_Y_ffpe==1])
+nb_germline_pred = len(test_pred_ffpe[test_pred_ffpe['lgbm_preds']=='germline'])
+nb_somatic_pred = len(test_pred_ffpe[test_pred_ffpe['lgbm_preds']=='somatic'])
+print('[test ffpe-dlbcl set] real nb of germline: '
+      + str(nb_germline)
+      + ', somatic: '
       + str(nb_somatic))
+print('[test ffpe-dlbcl set] predicted nb of germline: '
+      + str(nb_germline_pred)
+      + ', somatic: '
+      + str(nb_somatic_pred))
+
+### test mixanc
+preds_lgbm = gbm.predict(test_X_anc.drop(columns=drop_cols),
+num_iteration=gbm.best_iteration)
+accuracy('lgbm-test-mixanc', test_Y_anc, preds_lgbm)
+test_pred_anc['lgbm_preds'] = np.where(preds_lgbm>0.5,'somatic','germline')
+nb_germline = len(test_Y_anc[test_Y_anc==0])
+nb_somatic = len(test_Y_anc[test_Y_anc==1])
+nb_germline_pred = len(test_pred_anc[test_pred_anc['lgbm_preds']=='germline'])
+nb_somatic_pred = len(test_pred_anc[test_pred_anc['lgbm_preds']=='somatic'])
+print('[test mixanc set] real nb of germline: '
+      + str(nb_germline)
+      + ', somatic: '
+      + str(nb_somatic))
+print('[test mixanc set] predicted nb of germline: '
+      + str(nb_germline_pred)
+      + ', somatic: '
+      + str(nb_somatic_pred))
 
 ## tabnet ----------------------------------------------------------------------
 
@@ -880,7 +1159,10 @@ X_test_m = test_X_m.drop(columns=drop_cols).to_numpy()
 Y_test_m = test_Y_m.to_numpy().squeeze()
 X_test_mix = test_X_mix.drop(columns=drop_cols).to_numpy()
 Y_test_mix = test_Y_mix.to_numpy().squeeze()
-X_test = test_X.drop(columns=drop_cols).to_numpy()
+X_test_ffpe = test_X_ffpe.drop(columns=drop_cols).to_numpy()
+Y_test_ffpe = test_Y_ffpe.to_numpy().squeeze()
+X_test_anc = test_X_anc.drop(columns=drop_cols).to_numpy()
+Y_test_anc = test_Y_anc.to_numpy().squeeze()
 
 ### classifier
 classifier = TabNetClassifier(n_d=24, n_a=24, n_steps=4, gamma=1.5,
@@ -987,24 +1269,49 @@ print('[test mixtcga set] real nb of germline: '
       + str(nb_germline) 
       + ', somatic: ' 
       + str(nb_somatic))
-print('[test mixtcga set] predicted nb of germline: ' 
-      + str(nb_germline_pred) 
-      + ', somatic: ' 
+print('[test mixtcga set] predicted nb of germline: '
+      + str(nb_germline_pred)
+      + ', somatic: '
       + str(nb_somatic_pred))
 
-### test tnbc data
-preds =  classifier.predict_proba(X_test)[:, 1]
-test_pred['tabnet_preds'] = np.where(preds>0.5,'somatic','germline')
-nb_germline = len(test_pred[test_pred['tabnet_preds']=='germline'])
-nb_somatic = len(test_pred[test_pred['tabnet_preds']=='somatic'])
-print('[test TNBC set] predicted nb of germline: ' 
-      + str(nb_germline) 
-      + ', somatic: ' 
+### test ffpe-dlbcl
+preds = classifier.predict_proba(X_test_ffpe)[:, 1]
+accuracy('tabnet-test-ffpe-dlbcl', test_Y_ffpe, preds)
+test_pred_ffpe['tabnet_preds'] = np.where(preds>0.5,'somatic','germline')
+nb_germline = len(test_Y_ffpe[test_Y_ffpe==0])
+nb_somatic = len(test_Y_ffpe[test_Y_ffpe==1])
+nb_germline_pred = len(test_pred_ffpe[test_pred_ffpe['tabnet_preds']=='germline'])
+nb_somatic_pred = len(test_pred_ffpe[test_pred_ffpe['tabnet_preds']=='somatic'])
+print('[test ffpe-dlbcl set] real nb of germline: '
+      + str(nb_germline)
+      + ', somatic: '
       + str(nb_somatic))
+print('[test ffpe-dlbcl set] predicted nb of germline: '
+      + str(nb_germline_pred)
+      + ', somatic: '
+      + str(nb_somatic_pred))
+
+### test mixanc
+preds = classifier.predict_proba(X_test_anc)[:, 1]
+accuracy('tabnet-test-mixanc', test_Y_anc, preds)
+test_pred_anc['tabnet_preds'] = np.where(preds>0.5,'somatic','germline')
+nb_germline = len(test_Y_anc[test_Y_anc==0])
+nb_somatic = len(test_Y_anc[test_Y_anc==1])
+nb_germline_pred = len(test_pred_anc[test_pred_anc['tabnet_preds']=='germline'])
+nb_somatic_pred = len(test_pred_anc[test_pred_anc['tabnet_preds']=='somatic'])
+print('[test mixanc set] real nb of germline: '
+      + str(nb_germline)
+      + ', somatic: '
+      + str(nb_somatic))
+print('[test mixanc set] predicted nb of germline: '
+      + str(nb_germline_pred)
+      + ', somatic: '
+      + str(nb_somatic_pred))
 
 ### save predicts output
 train_pred.to_csv(output_dir + '/preds-train.csv', index = False)
 validation_pred.to_csv(output_dir + '/preds-validation.csv', index = False)
 test_pred_m.to_csv(output_dir + '/preds-test-melanoma.csv', index = False)
 test_pred_mix.to_csv(output_dir + '/preds-test-mixtcga.csv', index = False)
-test_pred.to_csv(output_dir + '/preds-test-tnbc.csv', index = False)
+test_pred_ffpe.to_csv(output_dir + '/preds-test-ffpe-dlbcl.csv', index = False)
+test_pred_anc.to_csv(output_dir + '/preds-test-mixanc.csv', index = False)
