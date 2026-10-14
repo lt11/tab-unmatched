@@ -10,3 +10,6 @@ validation
 aux/.Rhistory
 .lintr
 aux/stats-feat-by-feat-reps.tsv
+aux/read-me.txt
+quick-run.txt
+quick-superrun.txt
