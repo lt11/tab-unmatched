@@ -8,10 +8,20 @@ library(this.path)
 
 ## settings -------------------------------------------------------------------
 
-### folders
-dirBase <- dirname(this.dir())
+### folders: the run folder and the metadata table are the first and the
+### second argument if given, else the folder above this script and its tab/
+args <- commandArgs(trailingOnly = T)
+if (length(args) >= 1L) {
+  dirBase <- normalizePath(args[1], mustWork = T)
+} else {
+  dirBase <- dirname(this.dir())
+}
 pathRes <- file.path(dirBase, "res")
-pathTab <- file.path(dirBase, "tab")
+if (length(args) >= 2L) {
+  pathMeta <- normalizePath(args[2], mustWork = T)
+} else {
+  pathMeta <- file.path(dirBase, "tab", "metadata.csv")
+}
 pathOut <- file.path(pathRes, "metadata-tmb.txt")
 
 ### kit sizes
@@ -64,7 +74,7 @@ dtCounts <- dtAllCsvFiles[
 ]
 
 ### read the metadata
-dtMetadata <- fread(file.path(pathTab, "metadata.csv"), stringsAsFactors = F)
+dtMetadata <- fread(pathMeta, stringsAsFactors = F)
 colnames(dtMetadata) <- gsub("\\s+", "_", colnames(dtMetadata))
 
 ### inner‐join on fastq_id to keep only those present in both

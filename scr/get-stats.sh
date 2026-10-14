@@ -1,120 +1,130 @@
 #!/bin/bash
 
-### A script that generates the input table for "plot-featprog-reps.R". 
+### A script that generates the input table for "plot-featprog-reps.R",
+### with metrics: auc, accuracy, precision, recall, tnr, npv.
+### It needs run-<N><replicate> folders, e.g. ../run-1a ... ../run-23e,
+### next to the folder holding this script, each with the results of its run:
+### ../run-1a/res/auc-*.txt
+### ../run-1a/res/scores.txt
+### ../run-1a/res/model-lgbm.txt
+### Usage: get-stats.sh <split> [<split> ...] > stats-feat-by-feat-reps-tests.tsv
+### e.g.:  get-stats.sh test-melanoma test-mixtcga test-mixanc test-ffpe-dlbcl
 
-## settings -------------------------------------------------------------------
+## settings -------------------------------------------------------------------
 
-all_dirs="run-70 run-71 run-72 run-73 run-74 run-75 run-76 run-77 run-78 \
-run-79 run-80 run-81 run-82 run-83 run-84 run-85 run-86 run-87 run-88 \
-run-89 run-90 run-91 run-59"
+### every run-<N><replicate> folder (e.g. run-12c) next to the folder containing
+### this script, in run order; any other run-* folder is left out
+script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+all_dirs=$(cd "${script_dir}/.." && for d in run-*/; do
+	d=${d%/}
+	[[ -d "${d}" && "${d}" =~ ^run-[0-9]+[a-e]$ ]] && printf '%s\n' "${d}"
+done | sort -V | tr '\n' ' ')
+
+# set names as in scores.txt and in the auc file names, from the command line
+all_splits="${*}"
+
+### <column label>:<auc file tag>:<first scores column>: ...
+### <last scores column>:<model name in scores.txt>
+### scores columns hold precision, recall, accuracy, tnr, npv
+all_models="xgboost:xgboost:10:14:XGBoost \
+lightgbm:lgbm:21:25:LightGBM \
+tabnet:tabnet:32:36:TabNet"
 
 ## clmnt ----------------------------------------------------------------------
 
-cd ..
+cd "${script_dir}/.."
 
-printf "N_run\tN_features\
-\tauc_validation_xgboost\tauc_test_mm_xgboost\tauc_test_tcga_xgboost\
-\taccuracy_validation_xgboost\tprecision_validation_xgboost\
-\trecall_validation_xgboost\ttnr_validation_xgboost\
-\tnpv_validation_xgboost\taccuracy_test_melanoma_xgboost\
-\tprecision_test_melanoma_xgboost\trecall_test_melanoma_xgboost\
-\ttnr_test_melanoma_xgboost\tnpv_test_melanoma_xgboost\
-\taccuracy_test_mixtcga_xgboost\tprecision_test_mixtcga_xgboost\
-\trecall_test_mixtcga_xgboost\ttnr_test_mixtcga_xgboost\
-\tnpv_test_mixtcga_xgboost\tauc_validation_lightgbm\
-\tauc_test_mm_lightgbm\tauc_test_tcga_lightgbm\
-\taccuracy_validation_lightgbm\tprecision_validation_lightgbm\
-\trecall_validation_lightgbm\ttnr_validation_lightgbm\
-\tnpv_validation_lightgbm\taccuracy_test_melanoma_lightgbm\
-\tprecision_test_melanoma_lightgbm\trecall_test_melanoma_lightgbm\
-\ttnr_test_melanoma_lightgbm\tnpv_test_melanoma_lightgbm\
-\taccuracy_test_mixtcga_lightgbm\tprecision_test_mixtcga_lightgbm\
-\trecall_test_mixtcga_lightgbm\ttnr_test_mixtcga_lightgbm\
-\tnpv_test_mixtcga_lightgbm\tauc_validation_tabnet\
-\tauc_test_mm_tabnet\tauc_test_tcga_tabnet\taccuracy_validation_tabnet\
-\tprecision_validation_tabnet\trecall_validation_tabnet\ttnr_validation_tabnet\
-\tnpv_validation_tabnet\taccuracy_test_melanoma_tabnet\
-\tprecision_test_melanoma_tabnet\trecall_test_melanoma_tabnet\
-\ttnr_test_melanoma_tabnet\tnpv_test_melanoma_tabnet\
-\taccuracy_test_mixtcga_tabnet\tprecision_test_mixtcga_tabnet\
-\trecall_test_mixtcga_tabnet\ttnr_test_mixtcga_tabnet\
-\tnpv_test_mixtcga_tabnet\n"
+tab=$'\t'
+
+die() {
+	echo "ERROR: ${1}" >&2
+	exit 1
+}
+
+require_file() {
+	local file=${1} run=${2}
+	[ -f "${file}" ] || die "${run}: missing file ${file}"
+}
 
 check_cols() {
 	local file=${1} start=${2} end=${3} model=${4} run=${5}
 	local bad
-	bad=$(head -1 "${file}" | cut -f ${start}-${end} | awk -F'\t' -v m="${model}" '{for(i=1;i<=NF;i++) if ($i !~ m) print i}')
+	bad=$(head -1 "${file}" | cut -f ${start}-${end} | \
+	  awk -F'\t' -v m="${model}" '{for(i=1;i<=NF;i++) if ($i !~ m) print i}')
 	if [ -n "${bad}" ]; then
-		echo "ERROR: ${run}: columns ${start}-${end} in ${file} are not all '${model}' (mismatched field(s): ${bad})" >&2
+		echo "ERROR: ${run}: columns ${start}-${end} in ${file} are" \
+		  "not all '${model}' (mismatched field(s): ${bad})" >&2
 		exit 1
 	fi
 }
+
+### a split missing from a run (e.g. runs older than test-mixanc or
+### test-ffpe-dlbcl) has neither its auc files nor its row in scores.txt, so
+### both readers fall back to NA
+read_auc() {
+	if [ -f "${1}" ]; then cat "${1}"; else echo NA; fi
+}
+
+### scores row picked by set name rather than line number
+read_set() {
+	local file=${1} start=${2} end=${3} set=${4}
+	awk -F'\t' -v s="${set}" -v a="${start}" -v b="${end}" '
+		$1 == s { for (i = a; i <= b; i++) printf "%s%s", $i, (i < b ? " " : "\n"); f = 1; exit }
+		END { if (!f) print "NA NA NA NA NA" }' "${file}"
+}
+
+[ -n "${all_splits}" ] || die "no split given; usage: $(basename "${0}") <split> [<split> ...]"
+[ -n "${all_dirs}" ] || die "no run-<N><a-e> folders in $(pwd)"
+
+### a split found in no run at all is most likely a typo
+for split in ${all_splits}; do
+	found=
+	for i in ${all_dirs}; do
+		awk -F'\t' -v s="${split}" '$1 == s { f = 1; exit } END { exit !f }' \
+		  "${i}/res/scores.txt" 2>/dev/null && { found=1; break; }
+	done
+	[ -n "${found}" ] || die "split '${split}' not found in the scores.txt of any run"
+done
+
+### header: <metric>_<split>_<model>, e.g. auc_test_melanoma_xgboost
+header="N_run${tab}N_features"
+for split in ${all_splits}; do
+	for model in ${all_models}; do
+		IFS=: read -r label tag start end name <<< "${model}"
+		for metric in auc accuracy precision recall tnr npv; do
+			header+="${tab}${metric}_${split//-/_}_${label}"
+		done
+	done
+done
+printf '%s\n' "${header}"
 
 for i in ${all_dirs}; do
 	n_run=${i#run-}
 	res=${i}/res
 	scores=${res}/scores.txt
+	model_lgbm=${res}/model-lgbm.txt
 
-	check_cols "${scores}" 10 14 "XGBoost" "${i}"
-	check_cols "${scores}" 21 25 "LightGBM" "${i}"
-	check_cols "${scores}" 32 36 "TabNet" "${i}"
+	require_file "${scores}" "${i}"
+	require_file "${model_lgbm}" "${i}"
 
-	max_feature_idx=$(grep -m1 "^max_feature_idx=" ${res}/model-lgbm.txt | cut -d= -f2)
+	for model in ${all_models}; do
+		IFS=: read -r label tag start end name <<< "${model}"
+		check_cols "${scores}" ${start} ${end} "${name}" "${i}"
+	done
+
+	max_feature_idx=$(grep -m1 "^max_feature_idx=" ${model_lgbm} | cut -d= -f2)
+	[[ "${max_feature_idx}" =~ ^[0-9]+$ ]] || \
+	  die "${i}: missing or non-numeric 'max_feature_idx=' row in ${model_lgbm}"
 	n_features=$((max_feature_idx + 1))
 
-	auc_val_xgb=$(cat ${res}/auc-xgboost-validation.txt)
-	auc_mm_xgb=$(cat ${res}/auc-xgboost-test-melanoma.txt)
-	auc_tcga_xgb=$(cat ${res}/auc-xgboost-test-mixtcga.txt)
-
-	auc_val_lgb=$(cat ${res}/auc-lgbm-validation.txt)
-	auc_mm_lgb=$(cat ${res}/auc-lgbm-test-melanoma.txt)
-	auc_tcga_lgb=$(cat ${res}/auc-lgbm-test-mixtcga.txt)
-
-	auc_val_tab=$(cat ${res}/auc-tabnet-validation.txt)
-	auc_mm_tab=$(cat ${res}/auc-tabnet-test-melanoma.txt)
-	auc_tcga_tab=$(cat ${res}/auc-tabnet-test-mixtcga.txt)
-
-	# columns 10-14: precision, recall, accuracy, tnr, npv (xgboost)
-	read -r prec_val_xgb rec_val_xgb acc_val_xgb tnr_val_xgb npv_val_xgb <<< "$(cut -f 10-14 ${scores} | sed -n 3p)"
-	read -r prec_mel_xgb rec_mel_xgb acc_mel_xgb tnr_mel_xgb npv_mel_xgb <<< "$(cut -f 10-14 ${scores} | sed -n 4p)"
-	read -r prec_tcga_xgb rec_tcga_xgb acc_tcga_xgb tnr_tcga_xgb npv_tcga_xgb <<< "$(cut -f 10-14 ${scores} | sed -n 5p)"
-
-	# columns 21-25: precision, recall, accuracy, tnr, npv (lightgbm)
-	read -r prec_val_lgb rec_val_lgb acc_val_lgb tnr_val_lgb npv_val_lgb <<< "$(cut -f 21-25 ${scores} | sed -n 3p)"
-	read -r prec_mel_lgb rec_mel_lgb acc_mel_lgb tnr_mel_lgb npv_mel_lgb <<< "$(cut -f 21-25 ${scores} | sed -n 4p)"
-	read -r prec_tcga_lgb rec_tcga_lgb acc_tcga_lgb tnr_tcga_lgb npv_tcga_lgb <<< "$(cut -f 21-25 ${scores} | sed -n 5p)"
-
-	# columns 32-36: precision, recall, accuracy, tnr, npv (tabnet)
-	read -r prec_val_tab rec_val_tab acc_val_tab tnr_val_tab npv_val_tab <<< "$(cut -f 32-36 ${scores} | sed -n 3p)"
-	read -r prec_mel_tab rec_mel_tab acc_mel_tab tnr_mel_tab npv_mel_tab <<< "$(cut -f 32-36 ${scores} | sed -n 4p)"
-	read -r prec_tcga_tab rec_tcga_tab acc_tcga_tab tnr_tcga_tab npv_tcga_tab <<< "$(cut -f 32-36 ${scores} | sed -n 5p)"
-
-	printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t'\
-'%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t'\
-'%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t'\
-'%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t'\
-'%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t'\
-'%s\t%s\t%s\t%s\t%s\t%s\n' \
-		"${n_run}" "${n_features}" \
-		"${auc_val_xgb}" "${auc_mm_xgb}" "${auc_tcga_xgb}" \
-		"${acc_val_xgb}" "${prec_val_xgb}" "${rec_val_xgb}" \
-		"${tnr_val_xgb}" "${npv_val_xgb}" \
-		"${acc_mel_xgb}" "${prec_mel_xgb}" "${rec_mel_xgb}" \
-		"${tnr_mel_xgb}" "${npv_mel_xgb}" \
-		"${acc_tcga_xgb}" "${prec_tcga_xgb}" "${rec_tcga_xgb}" \
-		"${tnr_tcga_xgb}" "${npv_tcga_xgb}" \
-		"${auc_val_lgb}" "${auc_mm_lgb}" "${auc_tcga_lgb}" \
-		"${acc_val_lgb}" "${prec_val_lgb}" "${rec_val_lgb}" \
-		"${tnr_val_lgb}" "${npv_val_lgb}" \
-		"${acc_mel_lgb}" "${prec_mel_lgb}" "${rec_mel_lgb}" \
-		"${tnr_mel_lgb}" "${npv_mel_lgb}" \
-		"${acc_tcga_lgb}" "${prec_tcga_lgb}" "${rec_tcga_lgb}" \
-		"${tnr_tcga_lgb}" "${npv_tcga_lgb}" \
-		"${auc_val_tab}" "${auc_mm_tab}" "${auc_tcga_tab}" \
-		"${acc_val_tab}" "${prec_val_tab}" "${rec_val_tab}" \
-		"${tnr_val_tab}" "${npv_val_tab}" \
-		"${acc_mel_tab}" "${prec_mel_tab}" "${rec_mel_tab}" \
-		"${tnr_mel_tab}" "${npv_mel_tab}" \
-		"${acc_tcga_tab}" "${prec_tcga_tab}" "${rec_tcga_tab}" \
-		"${tnr_tcga_tab}" "${npv_tcga_tab}"
+	row="${n_run}${tab}${n_features}"
+	for split in ${all_splits}; do
+		for model in ${all_models}; do
+			IFS=: read -r label tag start end name <<< "${model}"
+			auc=$(read_auc ${res}/auc-${tag}-${split}.txt)
+			read -r prec rec acc tnr npv <<< "$(read_set ${scores} ${start} ${end} ${split})"
+			row+="${tab}${auc}${tab}${acc}${tab}${prec}${tab}${rec}${tab}${tnr}${tab}${npv}"
+		done
+	done
+	printf '%s\n' "${row}"
 done

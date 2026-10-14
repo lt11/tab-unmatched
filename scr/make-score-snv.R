@@ -10,7 +10,14 @@ library(scriptName)
 ## settings -------------------------------------------------------------------
 
 ### fixed settings
-dirBase <- dirname(this.dir())
+### the run folder is the first argument if given, else the folder
+### above this script
+args <- commandArgs(trailingOnly = T)
+if (length(args) >= 1L) {
+  dirBase <- normalizePath(args[1], mustWork = T)
+} else {
+  dirBase <- dirname(this.dir())
+}
 dirData <- file.path(dirBase, "res")
 strSets <- c("train", "validation", 
              "test-melanoma", "test-mixtcga", "test-ffpe-dlbcl",
