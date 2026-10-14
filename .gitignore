@@ -1,7 +1,6 @@
 aux/read-me.txt
 splits
-bck-aux
-bck-scr
+bck-*
 plots
 res
 test
