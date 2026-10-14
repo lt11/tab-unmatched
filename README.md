@@ -21,9 +21,12 @@ The pipeline performs:
 
 ## Input Data
 
-The input VCF data can be prepared using the script "aux/prep-data.sh" after setting the folder paths in the "settings" section. 
+The input VCF files are those produced by the mulo-wesml pipeline, one per tumour sample, named after its fastq id. Two tables describe them:
 
-A table with metadata (e.g. cancer type, sample identifier, sample ancestry), e.g. "tab/metadata.csv", is also needed.
+- "tab/metadata.csv": the metadata of each sample (e.g. cancer type, sample identifier, sample ancestry); its "split" column assigns every tumour sample to one set: train, validation, test-mixtcga, test-mixanc, test-metmel or test-ffpe-dlbcl
+- "tab/index-paths.txt": the path of every VCF, one per line, relative to the mulo-wesml folder, e.g. "run-9/var-calls/gt/9fb63209f7f145db94e3f57f4e510a4f.vcf.gz"
+
+The superrunner (see Usage) checks both tables and prepares the VCFs of each set.
 
 ---
 
@@ -64,7 +67,9 @@ The pipeline generates:
 - ROC curves and AUC scores
 - Feature importance plots
 
-Additional tables and plots can be generated running "aux/run-r.sh". These include:
+ROC curves and AUC scores are NOT produced for train and validation sets.
+
+Additional tables and plots can be generated running "scr/run-r.sh", or the R scripts one by one with the run folder as argument (the superrunner does this for every run). These include:
 - Tumour Mutational Burden (TMB) tables
 - TMB box plots
 - TMB regression against the literature
@@ -94,20 +99,68 @@ Then, install the following Python modules:
 - lightgbm
 - torch
 - torchvision
+- pytorch-tabnet
 - category_encoders
 - joblib
+
+and the following R packages:
+
+- data.table
+- ggplot2
+- this.path
+- scriptName
 
 ---
 
 ## Usage
 
-Once you have prepared the VCF data with "prep-data.sh", running the script is as simple as:
+### Feature progression with the superrunner
+
+"scr/superrunner.sh" runs a whole feature progression in one go. Run 1 keeps every feature, run 2 drops the first feature of the "drop_order" list in the settings of the superrunner, run 3 the first two, and so on. Every run has five replicates (a to e), each with its own seed, and the same seeds are used for every run. Finally, the superrunner collects the stats with "scr/get-stats.sh" and plots them with "scr/plot-featprog-reps.R".
+
+Each experiment lives in its own folder, called $dir_base below:
 
 ```
-python unc-normal-drop-5.py
+$dir_base/
+├── scr/                   all the code: scr/* of this repository
+├── dat/
+│   ├── tab/               metadata.csv and index-paths.txt
+│   ├── splits/            the sample lists of each set and their checks
+│   ├── vcf/               the VCFs of each set, copied and unpacked once
+│   └── feat/              the feature tables, built once and shared by every run
+├── run-1a/ ... run-1e/    every feature
+├── run-2a/ ... run-2e/    every feature but the first of drop_order, and so on
+│   └── res/ plots/ log/   the results, the TMB plots and the logs of the run
+└── res/
+    ├── accu-prog/         stats of the test splits, and of train and validation
+    └── accu-prog-plots/   one plot per metric
 ```
 
-Users can flexibly tailor the feature space by editing the "optional_drop_features" parameter defined at the beginning of the script. By specifying a list of feature names (e.g. ['CNT', 'DP', 'ontology_missense']), these variables will be excluded from the training and prediction matrices prior to model fitting. If set to ['none'], no additional features are removed beyond the default metadata columns. This design enables straightforward experimentation with feature selection strategies, allowing users to assess the impact of specific variables on model performance without modifying the core pipeline logic.
+To set up and launch an experiment:
+
+```
+mkdir -p $dir_base/scr $dir_base/dat/tab
+cp scr/*.py scr/*.R scr/*.sh $dir_base/scr/
+cp tab/metadata.csv tab/index-paths.txt $dir_base/dat/tab/
+cd $dir_base
+nohup bash scr/superrunner.sh > superrunner.log 2>&1 &
+```
+
+The settings at the top of the superrunner hold the location of the mulo-wesml folder ("vcf_src_candidates", the first that exists is used), the replicates and their seeds, and "drop_order".
+
+The superrunner stops at the first failure, with a message pointing to the log of the step that failed. Launched again, it keeps what is already done (the data and the finished runs) and redoes an unfinished run from scratch. It never mixes results: a finished run made with other settings, or data prepared from another metadata.csv or index-paths.txt, stops it with a message saying what to remove.
+
+### A single run
+
+The Python script can also be run on its own. With no paths given, it reads train/, validation/, test/<subtype>/ and tab/metadata.csv in the parent of the working directory, and writes its results in res/ there:
+
+```
+python unc-normal-drop-9.py <seed> [<run_logit>] [<run_hf>] [--drop-features <feature> ...]
+```
+
+The options "--dir-vcf", "--file-meta", "--dir-out" and "--dir-feat" set the paths explicitly. With "--stage prep" the script only builds the feature tables, and with "--stage train" it only trains the models on tables built before.
+
+Users can tailor the feature space with the "--drop-features" option. The features listed (e.g. CNT DP ontology_missense, any of "valid_drop_features" at the beginning of the script) are excluded from the training and prediction matrices prior to model fitting. With "none", the default, no features are removed beyond the default metadata columns, and an unknown feature name stops the script. This design enables straightforward experimentation with feature selection strategies, allowing users to assess the impact of specific variables on model performance without modifying the core pipeline logic.
 
 ---
 
