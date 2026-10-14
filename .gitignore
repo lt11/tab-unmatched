@@ -1,4 +1,4 @@
-aux/read-me.txt
+scr/read-me.txt
 splits
 bck-*
 plots
@@ -7,9 +7,12 @@ test
 train
 validation
 .DS_Store
-aux/.Rhistory
+scr/.Rhistory
 .lintr
-aux/stats-feat-by-feat-reps.tsv
-aux/read-me.txt
+scr/stats-feat-by-feat-reps.tsv
+scr/read-me.txt
 quick-run.txt
 quick-superrun.txt
+__pycache__/
+leg
+.vscode
