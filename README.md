@@ -155,7 +155,7 @@ The superrunner stops at the first failure, with a message pointing to the log o
 The Python script can also be run on its own. With no paths given, it reads train/, validation/, test/<subtype>/ and tab/metadata.csv in the parent of the working directory, and writes its results in res/ there:
 
 ```
-python unc-normal-drop-9.py <seed> [<run_logit>] [<run_hf>] [--drop-features <feature> ...]
+python unc-normal-drop-10.py <seed> [<run_logit>] [<run_hf>] [--drop-features <feature> ...]
 ```
 
 The options "--dir-vcf", "--file-meta", "--dir-out" and "--dir-feat" set the paths explicitly. With "--stage prep" the script only builds the feature tables, and with "--stage train" it only trains the models on tables built before.
