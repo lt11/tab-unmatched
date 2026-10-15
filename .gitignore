@@ -16,3 +16,5 @@ quick-superrun.txt
 __pycache__/
 leg
 .vscode
+dat
+run-*
