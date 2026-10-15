@@ -47,6 +47,15 @@ tmbVariants <- c("missense_variant",
                  "frameshift_variant&stop_lost",
                  "disruptive_inframe_deletion")
 
+## functions ------------------------------------------------------------------
+
+### somatic calls among the eligible rows of one sample; NA when the model
+### has no prediction for the sample (a disabled model writes NA everywhere)
+countSomatic <- function(isSomatic, isEligible) {
+  if (all(is.na(isSomatic))) return(NA_integer_)
+  sum(isSomatic & isEligible, na.rm = T)
+}
+
 ## clmnt ----------------------------------------------------------------------
 
 ### all preds* csv files in pathRes
@@ -59,16 +68,18 @@ dtAllCsvFiles  <- rbindlist(lsCsvFiles, use.names = T, fill = T)
 ### rename the column for convenience
 colnames(dtAllCsvFiles) <- gsub("\\s+", "_", colnames(dtAllCsvFiles))
 
-### for each fastq_id count the somatic rows where ANN is in the tmbVariants
+### for each fastq_id count the somatic rows where ANN is in the tmbVariants;
+### grouping over all rows keeps the samples without such rows (count 0)
+dtAllCsvFiles[, is_tmb_variant := ANN %in% tmbVariants]
 dtCounts <- dtAllCsvFiles[
-  ANN %in% tmbVariants,
+  ,
   .(
-    matched_somatic = sum(target == 1, na.rm = T),
-    xgm_somatic = sum(xgm_preds == "somatic", na.rm = T),
-    lgbm_somatic = sum(lgbm_preds == "somatic", na.rm = T),
-    tabnet_somatic = sum(tabnet_preds == "somatic", na.rm = T),
-    logreg_somatic = sum(logreg_preds == "somatic", na.rm = T),
-    hf_somatic = sum(hf_preds == "somatic", na.rm = T)
+    matched_somatic = countSomatic(target == 1, is_tmb_variant),
+    xgm_somatic = countSomatic(xgm_preds == "somatic", is_tmb_variant),
+    lgbm_somatic = countSomatic(lgbm_preds == "somatic", is_tmb_variant),
+    tabnet_somatic = countSomatic(tabnet_preds == "somatic", is_tmb_variant),
+    logreg_somatic = countSomatic(logreg_preds == "somatic", is_tmb_variant),
+    hf_somatic = countSomatic(hf_preds == "somatic", is_tmb_variant)
   ),
   by = fastq_id
 ]
@@ -77,12 +88,24 @@ dtCounts <- dtAllCsvFiles[
 dtMetadata <- fread(pathMeta, stringsAsFactors = F)
 colnames(dtMetadata) <- gsub("\\s+", "_", colnames(dtMetadata))
 
-### inner‐join on fastq_id to keep only those present in both
+### inner‐join on fastq_id: every sample with predictions is in dtCounts, so
+### this drops only the samples without metadata (no kit, hence no TMB)
 dtMetadataCounts <- merge(dtMetadata, dtCounts, by = "fastq_id",
                           all = F) ### only fastq_id in both
+idsNoMeta <- setdiff(dtCounts$fastq_id, dtMetadata$fastq_id)
+if (length(idsNoMeta) > 0L) {
+  cat("[calculate-tmb] ", length(idsNoMeta),
+      " samples with predictions but no metadata are left out: ",
+      paste(idsNoMeta, collapse = ", "), "\n", sep = "")
+}
 
 ### add kit_size
 dtMetadataCounts[, kit_size := kitSize[kit]]
+kitsNoSize <- setdiff(unique(dtMetadataCounts$kit), names(kitSize))
+if (length(kitsNoSize) > 0L) {
+  cat("[calculate-tmb] kits without a size, their TMB is NA: ",
+      paste(kitsNoSize, collapse = ", "), "\n", sep = "")
+}
 
 ### add TMB columns for each model
 dtMetadataCounts[, `:=`(

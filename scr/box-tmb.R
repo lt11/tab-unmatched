@@ -67,12 +67,19 @@ dtMeta <- fread(pathInTmb)
 ### keep test splits only
 dtMeta <- dtMeta[split %in% testSplits]
 
+### a disabled model has an all-NA TMB column, which fread reads as logical
+dtMeta[, (dtModels$column) := lapply(.SD, as.numeric),
+       .SDcols = dtModels$column]
+
 ### long format: one row per sample and model
 dtLong <- melt(dtMeta, id.vars = c("fastq_id", "split"),
                measure.vars = dtModels$column,
                variable.name = "model", value.name = "TMB")
 dtLong$model <- factor(dtLong$model, levels = dtModels$column,
                        labels = dtModels$title)
+
+### a disabled model has NA TMB: drop it rather than plot an empty box
+dtLong <- dtLong[!is.na(TMB)]
 
 ## free-axis plots (log scale) -------------------------------------------------
 
