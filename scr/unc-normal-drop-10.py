@@ -206,7 +206,6 @@ ontology_type = {
         'missense_variant&splice_region_variant'],
     'nonsense':[
         'stop_gained',
-        'frameshift_variant&stop_gained',
         'stop_gained&splice_region_variant'],
     'inframe_indel':[
         'disruptive_inframe_deletion',
@@ -215,6 +214,7 @@ ontology_type = {
     'frame_shift_indel':[
         'frameshift_variant&splice_donor_variant&' ### yep, no comma
         'splice_region_variant&intron_variant',
+        'frameshift_variant&stop_gained',
         'frameshift_variant&splice_region_variant',
         'frameshift_variant&stop_lost&splice_region_variant',
         'frameshift_variant'],
