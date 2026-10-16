@@ -20,37 +20,32 @@ vcf_src_candidates=(/data/ssd/lorenzot/prog/mulo-wesml
 run_logit="true"
 run_hf="true"
 ### the replicates and their seeds, in the same order
-reps=(a b c)
-all_seeds=(21709 11796 17856)
-# reps=(a b c d e)
-# all_seeds=(21709 11796 17856 24207 12554)
+reps=(a b c d e)
+all_seeds=(21709 11796 17856 24207 12554)
 ### the features dropped cumulatively, run-N drops the first N-1: any of
 ### valid_drop_features in the python script, quoted if holding '>'
 drop_order=(CNT
             ontology_NR
-            DP)
-# drop_order=(CNT
-#             ontology_NR
-#             DP
-#             ontology_inframe_indel
-#             AF
-#             ontology_frame_shift_indel
-#             AD
-#             pop_max
-#             subs_type_NA
-#             ontology_nonsense
-#             'subs_type_G>A'
-#             trinucleotide_TCA
-#             trinucleotide_GGG
-#             'subs_type_G>T'
-#             'subs_type_C>T'
-#             ontology_missense
-#             'subs_type_G>C'
-#             trinucleotide_TCC
-#             trinucleotide_GGA
-#             trinucleotide_TGA
-#             trinucleotide_GTG
-#             'subs_type_C>A')
+            DP
+            ontology_inframe_indel
+            AF
+            ontology_frame_shift_indel
+            AD
+            pop_max
+            subs_type_NA
+            ontology_nonsense
+            'subs_type_G>A'
+            trinucleotide_TCA
+            trinucleotide_GGG
+            'subs_type_G>T'
+            'subs_type_C>T'
+            ontology_missense
+            'subs_type_G>C'
+            trinucleotide_TCC
+            trinucleotide_GGA
+            trinucleotide_TGA
+            trinucleotide_GTG
+            'subs_type_C>A')
 ### the interpreters
 py_bin="python"
 r_bin="Rscript"
