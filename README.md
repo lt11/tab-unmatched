@@ -116,7 +116,7 @@ and the following R packages:
 
 ### Feature progression with the superrunner
 
-The file "scr/superrunner.sh" runs a whole feature progression in one go. Run 1 keeps every feature, run 2 drops the first feature of the "drop_order" list in the settings of the superrunner, run 3 the first two, and so on. Every run has five replicates (a to e), each with its own seed, and the same seeds are used for every run. Finally, the superrunner collects the stats with "scr/get-stats.sh" and plots them with "scr/plot-featprog-reps.R".
+The file "scr/superrunner.sh" runs a whole feature progression in one go. Run 1 keeps every feature, run 2 drops the first feature of the "drop_order" list in the settings of the superrunner, run 3 the first two, and so on. Every run has five replicates (a to e), each with its own seed (21709, 11796, 17856, 24207, and 12554), and the same seeds are used for every run. Finally, the superrunner collects the stats with "scr/get-stats.sh" and plots them with "scr/plot-featprog-reps.R".
 
 Each experiment lives in its own folder, called $dir_base below:
 
