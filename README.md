@@ -55,6 +55,10 @@ These models are designed to capture nonlinear relationships and interactions be
 
 Categorical variables, including substitution type, trinucleotide context, and functional ontology, are transformed using one-hot encoding to produce a machine-learning–compatible feature space. The encoding scheme is fitted on the training dataset and consistently reused across validation and test data sets to ensure feature alignment. In addition, biologically motivated filtering steps are applied to reduce noise: common germline variants are removed based on population frequency (pop_max ≥ 0.01), and the remaining germline variants are further restricted to a subset of functionally relevant annotation classes.
 
+To follow the approach of the original paper, these filters are applied to the training, validation, and test sets using the ground-truth somatic/germline labels derived from matched tumour–normal calls. Both filters remove only variants labelled germline (`target == 0`); somatic variants are retained regardless of these filtering criteria.
+
+Consequently, validation and test metrics describe performance on a population selected using ground-truth labels. They should not be interpreted as performance on an unfiltered tumour-only VCF, because the same filtering cannot be reproduced for unlabelled samples whose somatic/germline status is unknown. This label-dependent evaluation is retained for comparability with the original paper and should be considered when interpreting the reported results.
+
 ---
 
 ## Outputs
@@ -116,7 +120,7 @@ and the following R packages:
 
 ### Feature progression with the superrunner
 
-"scr/superrunner.sh" runs a whole feature progression in one go. Run 1 keeps every feature, run 2 drops the first feature of the "drop_order" list in the settings of the superrunner, run 3 the first two, and so on. Every run has five replicates (a to e), each with its own seed, and the same seeds are used for every run. Finally, the superrunner collects the stats with "scr/get-stats.sh" and plots them with "scr/plot-featprog-reps.R".
+The file "scr/superrunner.sh" runs a whole feature progression in one go. Run 1 keeps every feature, run 2 drops the first feature of the "drop_order" list in the settings of the superrunner, run 3 the first two, and so on. Every run has five replicates (a to e), each with its own seed, and the same seeds are used for every run. Finally, the superrunner collects the stats with "scr/get-stats.sh" and plots them with "scr/plot-featprog-reps.R".
 
 Each experiment lives in its own folder, called $dir_base below:
 
