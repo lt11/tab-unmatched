@@ -68,12 +68,8 @@ The pipeline generates:
 - Processed datasets (*-df.csv, *-df-flt.csv)
 - Model files
 - Prediction tables (preds-*.csv)
-- ROC curves and AUC scores
+- ROC curves and AUC scores (except for train data sets of the three ML models)
 - Feature importance plots
-
-ROC curves and AUC scores are NOT produced for train and validation sets.
-
-Additional tables and plots can be generated running "scr/run-r.sh", or the R scripts one by one with the run folder as argument (the superrunner does this for every run). These include:
 - Tumour Mutational Burden (TMB) tables
 - TMB box plots
 - TMB regression against the literature
