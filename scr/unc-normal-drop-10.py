@@ -862,7 +862,7 @@ bst.save_model(output_dir + 'model-xgboost.json')
 
 ### get feature importance
 booster = bst.get_booster()
-score_dict = booster.get_score(importance_type='gain')
+score_dict = booster.get_score(importance_type='total_gain')
 ### build a complete dictionary with all features, filling missing ones with 0
 feature_list = train_X.drop(columns=drop_cols).columns
 full_score_dict = {feat: score_dict.get(feat, 0) for feat in feature_list}
@@ -870,6 +870,8 @@ df_importance = pd.DataFrame(
     list(full_score_dict.items()),
     columns=['feature', 'importance']
     ).sort_values(by='importance', ascending=False)
+if df_importance['importance'].max() > 0:
+    df_importance['importance'] /= df_importance['importance'].max()
 
 ### plot feature importance
 myplot_importance(
@@ -1017,15 +1019,18 @@ gbm = lgb.train(params,
                                       validation_Y))
 gbm.save_model(output_dir+ '/model-lgbm.txt')
 
-### plot feature importance
-myplot_importance(gbm.feature_name(), gbm.feature_importance(), 'lgbm',
-                  output_dir)
-
 ### create a DataFrame from lightgbm feature importances
 df_importance_lgbm = pd.DataFrame({
     'feature': gbm.feature_name(),
-    'importance': gbm.feature_importance()
+    'importance': gbm.feature_importance(importance_type='gain')
 })
+if df_importance_lgbm['importance'].max() > 0:
+    df_importance_lgbm['importance'] /= df_importance_lgbm['importance'].max()
+
+### plot feature importance
+myplot_importance(df_importance_lgbm['feature'].tolist(),
+                  df_importance_lgbm['importance'].tolist(), 'lgbm',
+                  output_dir)
 
 ### sort and select top features
 top_lgbm = df_importance_lgbm.sort_values(by='importance', 
