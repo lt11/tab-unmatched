@@ -25,7 +25,6 @@ all_seeds=(21709 11796 17856 24207 12554)
 ### the features dropped cumulatively, run-N drops the first N-1: any of
 ### valid_drop_features in the python script, quoted if holding '>'
 drop_order=(CNT
-            ontology_NR
             DP
             ontology_inframe_indel
             AF
@@ -45,7 +44,8 @@ drop_order=(CNT
             trinucleotide_GGA
             trinucleotide_TGA
             trinucleotide_GTG
-            'subs_type_C>A')
+            'subs_type_C>A'
+            trinucleotide_TCT)
 ### the interpreters
 py_bin="python"
 r_bin="Rscript"
