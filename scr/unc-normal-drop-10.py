@@ -7,7 +7,6 @@ from __future__ import division
 ### the paths and the stage are read from the command line as well; with none
 ### of them given, everything sits next to the working directory as in drop-8
 valid_drop_features = ['CNT',
-                       'ontology_NR',
                        'DP',
                        'ontology_inframe_indel',
                        'AF',
@@ -27,7 +26,8 @@ valid_drop_features = ['CNT',
                        'trinucleotide_GGA',
                        'trinucleotide_TGA',
                        'trinucleotide_GTG',
-                       'subs_type_C>A']
+                       'subs_type_C>A',
+                       'trinucleotide_TCT']
 
 ## common methods -------------------------------------------------------------
 
