@@ -536,8 +536,7 @@ if args.stage != 'train':
         print("post pop_max filters germline variants Nb: " + str(count))
         count = (data['target'] == 1).sum()
         print("post pop_max filters somatic variants Nb: " + str(count))
-        ind_out = data[(data['target'] == 0) &
-                       (~data['ANN'].isin(ann_valid))].index
+        ind_out = data[~data['ANN'].isin(ann_valid)].index
         data.drop(index=ind_out, inplace=True)
         count = (data['target'] == 0).sum()
         print("post ANN filters germline variants Nb: " + str(count))

@@ -13,7 +13,7 @@ The pipeline performs:
 - VCF parsing and annotation extraction
 - Feature engineering from variant-level, sequence-context, and functional annotations
 - One-hot encoding of categorical features
-- Biologically motivated filtering of germline variants
+- Biologically motivated filtering of variants
 - Training and evaluation of multiple ML models
 - Prediction across validation and test cohorts
 
@@ -53,11 +53,7 @@ These models are designed to capture nonlinear relationships and interactions be
 
 ### Preprocessing
 
-Categorical variables, including substitution type, trinucleotide context, and functional ontology, are transformed using one-hot encoding to produce a machine-learning–compatible feature space. The encoding scheme is fitted on the training dataset and consistently reused across validation and test data sets to ensure feature alignment. In addition, biologically motivated filtering steps are applied to reduce noise: common germline variants are removed based on population frequency (pop_max ≥ 0.01), and the remaining germline variants are further restricted to a subset of functionally relevant annotation classes.
-
-To follow the approach of the original paper, these filters are applied to the training, validation, and test sets using the ground-truth somatic/germline labels derived from matched tumour–normal calls. Both filters remove only variants labelled germline (`target == 0`); somatic variants are retained regardless of these filtering criteria.
-
-Consequently, validation and test metrics describe performance on a population selected using ground-truth labels. They should not be interpreted as performance on an unfiltered tumour-only VCF, because the same filtering cannot be reproduced for unlabelled samples whose somatic/germline status is unknown. This label-dependent evaluation is retained for comparability with the original paper and should be considered when interpreting the reported results.
+Categorical variables, including substitution type, trinucleotide context, and functional ontology, are transformed using one-hot encoding to produce a machine-learning–compatible feature space. The encoding scheme is fitted on the training data set and consistently reused across validation and test data sets to ensure feature alignment. In addition, biologically motivated filtering steps are applied to reduce noise: common germline variants are removed based on population frequency (pop_max ≥ 0.01), and the remaining variants are further restricted to a subset of functionally relevant annotation classes.
 
 ---
 
@@ -65,7 +61,7 @@ Consequently, validation and test metrics describe performance on a population s
 
 The pipeline generates:
 
-- Processed datasets (*-df.csv, *-df-flt.csv)
+- Processed data sets (*-df.csv, *-df-flt.csv)
 - Model files
 - Prediction tables (preds-*.csv)
 - ROC curves and AUC scores (except for train data sets of the three ML models)
