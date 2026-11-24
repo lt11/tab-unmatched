@@ -24,28 +24,21 @@ reps=(a b c d e)
 all_seeds=(21709 11796 17856 24207 12554)
 ### the features dropped cumulatively, run-N drops the first N-1: any of
 ### valid_drop_features in the python script, quoted if holding '>'
-drop_order=(CNT
-            DP
-            ontology_inframe_indel
-            AF
-            ontology_frame_shift_indel
-            AD
-            pop_max
-            subs_type_NA
-            ontology_nonsense
+drop_order=('AF'
+            'subs_type_NA'
+            'pop_max'
+            'AD'
+            'DP'
+            'CNT'
+            'ontology_frame_shift_indel'
+            'trinucleotide_CAT'
+            'ontology_NR'
+            'trinucleotide_NA'
             'subs_type_G>A'
-            trinucleotide_TCA
-            trinucleotide_GGG
-            'subs_type_G>T'
-            'subs_type_C>T'
-            ontology_missense
-            'subs_type_G>C'
-            trinucleotide_TCC
-            trinucleotide_GGA
-            trinucleotide_TGA
-            trinucleotide_GTG
-            'subs_type_C>A'
-            trinucleotide_TCT)
+            'subs_type_T>C'
+            'ontology_missense'
+            'trinucleotide_AAA'
+            'trinucleotide_CGG')
 ### the interpreters
 py_bin="python"
 r_bin="Rscript"
