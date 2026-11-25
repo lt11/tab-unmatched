@@ -5,6 +5,7 @@ bck-*
 plots
 res
 test
+tests
 train
 validation
 .DS_Store
